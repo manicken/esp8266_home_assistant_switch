@@ -6,8 +6,9 @@
 #include <ESP8266httpUpdate.h>
 #include <ESP8266HTTPClient.h>
 #include <EEPROM.h>
+#include <LittleFS.h>
 #include "TCP2UART.h"
-#include "SPI.h"
+//#include "SPI.h"
 
 #include <ArduinoOTA.h>
 static int otaPartProcentCount = 0;
@@ -21,6 +22,9 @@ static int otaPartProcentCount = 0;
 
 #include <ArduinoJson.h>
 
+#include "FSBrowser.h"
+extern const char upload_html[];
+FSBrowser fsBrowser;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -32,8 +36,7 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1); // -1 = no reset pin
 
 TCP2UART tcp2uart;
 
-extern const char index_html[];
-extern const char main_js[];
+
 // QUICKFIX...See https://github.com/esp8266/Arduino/issues/263
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
@@ -44,32 +47,12 @@ extern const char main_js[];
 #define WIFI_TIMEOUT 30000              // checks WiFi every ...ms. Reset after this time, if WiFi cannot reconnect.
 #define HTTP_PORT 80
 
-#define DOGM_LCD_CS 0
-#define DOGM_LCD_RS 5
-
-#define PULSE_INPUT_A 12
-#define PULSE_INPUT_B 13
-
 unsigned long auto_last_change = 0;
 unsigned long last_wifi_check_time = 0;
 
 ESP8266WebServer server(HTTP_PORT);
 HTTPClient http;
 WiFiClient client;
-
-uint32_t pulsesLiter_A = 468;
-uint8_t changed_A = 0;
-uint32_t count_A = 0;
-uint32_t count_A_old = 0;
-
-uint32_t pulsesLiter_B = 360;
-uint8_t changed_B = 0;
-uint32_t count_B = 0;
-uint32_t count_B_old = 0;
-
-uint32_t test = 1234567890;
-
-uint8_t update_display = 0;
 
 unsigned long currTime = 0;
 unsigned long deltaTime_second = 0;
@@ -79,12 +62,48 @@ void checkForUpdates(void);
 void setup_BasicOTA(void);
 void sendOneSpiByte(uint8_t data);
 
-void waterMeter_A_ISR();
-void waterMeter_B_ISR();
-void DOGM_LCD_write12digitDec(uint32_t value);
 void oled_LCD_write12digitDec(uint32_t value, uint8_t maxDigits, uint8_t dotPos);
 
+void srv_handle_list_files();
+bool handleFileRead(String path);
+String getContentType(String filename);
+bool write_to_file(String file_name, String contents);
+bool load_from_file(String file_name, String &contents);
+
+
+DynamicJsonDocument jsonDoc(1024);
+
+#define HOME_ASSISTANT_SETTINGS_FILENAME "/ha/settings.json"
+
+bool loadHomeAssistantSettings()
+{
+    String json = "";
+    if (!load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, json))
+    {
+        jsonDoc["count"] = 8;
+        jsonDoc["authorization"] = F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ");
+        jsonDoc["server"] = F("http://192.168.1.107:8123/api/states/");
+        jsonDoc["items"][0]["id"] = "item1";
+        jsonDoc["items"][1]["id"] = "item2";
+        jsonDoc["items"][2]["id"] = "item3";
+        jsonDoc["items"][3]["id"] = "item4";
+        jsonDoc["items"][4]["id"] = "item5";
+        jsonDoc["items"][5]["id"] = "item6";
+        jsonDoc["items"][6]["id"] = "item7";
+        jsonDoc["items"][7]["id"] = "item8";
+        serializeJsonPretty(jsonDoc, json);
+        write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, json);
+        return false;
+    }
+    deserializeJson(jsonDoc, json);
+    return true;
+}
+
 void setup() {
+    LittleFS.begin();
+
+    loadHomeAssistantSettings();
+
     DEBUG_UART.begin(115200);
     DEBUG_UART.println(F("\r\n!!!!!Start of MAIN Setup!!!!!\r\n"));
 
@@ -96,37 +115,20 @@ void setup() {
         delay(2000);
         display.clearDisplay();
         display.display();
-        //display.setFont(&FreeMono9pt7b);
         display.setTextSize(1);
         display.setTextColor(WHITE, BLACK);
-        //display.setCursor(0, 0);
-        /*// Display static text
-        display.println("Hello world universe");
-        display.setCursor(1, 9);
-        display.println("012345678901234567890");
-        display.setCursor(0, 17);
-        display.println("ABCDEFGHIJKLMNOPQRSTU");
-        display.setCursor(0, 25);
-        display.println("@!\"#-_+?%&/(){[]};:=");
-        display.display();
-        */
     }
     else{
         DEBUG_UART.println(F("oled init fail"));
         if (display.begin(SSD1306_SWITCHCAPVCC, 0x3D))
             DEBUG_UART.println(F("oled addr is 0x3D"));
     }
-    //DOGM_LCD_init();
-    //DOGM_LCD_setCursor(0, 0);
-    //DOGM_LCD_writeStr("STARTING...");
-
     
     printESP_info();
     
     WiFiManager wifiManager;
     DEBUG_UART.println(F("trying to connect to saved wifi"));
-    //DOGM_LCD_setCursor(1, 0);
-    //DOGM_LCD_writeStr("WIFI CONNECTING.");
+    
     display.setCursor(0, 0);
     display.println("WiFi connecting...");
     display.display();
@@ -136,101 +138,40 @@ void setup() {
         display.setCursor(0, 17);
         display.println(WiFi.localIP());
         display.display();
-        delay(2000);
     } else {
         display.setCursor(0, 9);
         display.println("FAIL");
         display.display();
-        delay(2000);
     }
+    //delay(2000);
     //checkForUpdates();
     setup_BasicOTA();
     tcp2uart.begin();
 
-    //DOGM_LCD_setCursor(0, 0);
-    //DOGM_LCD_writeStr("RAW:");
-    display.clearDisplay();
-    display.display();
+    //display.clearDisplay();
+   // display.display();
 
-    //display.setCursor(0, 0);
-    //display.print("RAW_A:");
-
-    //display.setCursor(0, 8);
-    //display.print("RAW_B:");
-    
-    //DOGM_LCD_setCursor(1, 0);
-    //DOGM_LCD_writeStr("LITERS:0000000.0");
-    //display.setCursor(0, 16);
-    //display.print("LITERS:0000000.0");
-    
-    //DOGM_LCD_setCursor(2, 0);
-    //DOGM_LCD_writeStr("LITER/MIN:0000.0");
-    //display.setCursor(0, 24);
-    //display.print("LITER/MIN:0000.0");
-    /*
-    display.setCursor(0, 0);
-    oled_LCD_write12digitDec(count_A, 10, 0);
-    display.setCursor(0, 16);
-    oled_LCD_write12digitDec((count_A * 10) / pulsesLiter_A, 9, 1);
-
-    display.setCursor(68, 0);
-    oled_LCD_write12digitDec(count_B, 10, 0);
-    display.setCursor(68, 16);
-    oled_LCD_write12digitDec((count_B * 10) / pulsesLiter_B, 9, 1);
-*/
-    //display.setTextSize(2);
-    display.display();
-
-    pinMode(PULSE_INPUT_A, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(PULSE_INPUT_A), waterMeter_A_ISR, RISING);
-
-    pinMode(PULSE_INPUT_B, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(PULSE_INPUT_B), waterMeter_B_ISR, RISING);    
-    
     DEBUG_UART.println(F("\r\n!!!!!End of MAIN Setup!!!!!\r\n"));
 
     Wire.beginTransmission(0x38);
     Wire.write(0xFF); // all led off & all inputs
     Wire.endTransmission(0x38);
 
+    server.on("/listFiles", srv_handle_list_files);
+    server.on("/formatLittleFs", []() { if (LittleFS.format()) server.send(200,"text/html", "Format OK"); else server.send(200,"text/html", "format Fail"); });
+    server.onNotFound([]() {                              // If the client requests any URI
+        if (!handleFileRead(server.uri()))                  // send it if it exists
+            server.send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
+    });
+    fsBrowser.setup(server); // this contains failsafe upload
+    server.begin(HTTP_PORT);
 }
 
 uint8_t keyState = 0;
 uint8_t keyStateOld = 0;
 uint8_t ledState = 0;
 uint8_t rawWrite = 0;
-unsigned long deltaTime_minute = 0;
-
-uint32_t count_A_old2 = 0;
-uint32_t count_B_old2 = 0;
-
-uint32_t calcTotalDeciLiters_A = 0;
-uint32_t calcTotalDeciLiters_B = 0;
-
-uint32_t calcTotalDeciLiters_old_A = 0;
-uint32_t calcTotalDeciLiters_old_B = 0;
-
-uint32_t calcFlow_A = 0;
-uint32_t calcFlow_B = 0;
-
-uint32_t calcFlow_old_A = 0;
-uint32_t calcFlow_old_B = 0;
-
-uint16_t pressure_A = 0;
-uint16_t pressure_B = 0;
-
-uint32_t pressure_average_count = 0;
-uint32_t pressure_A_average_current = 0;
-uint32_t pressure_B_average_current = 0;
-
-uint32_t pressure_A_average = 0;
-uint32_t pressure_B_average = 0;
-
-uint32_t pressure_A_average_old = 0;
-uint32_t pressure_B_average_old = 0;
-
-String urlApi = "";
-int8_t anyChanged = 0;
+uint8_t update_display = 0;
 
 void set_HomeAssistant_switch_state(const String &entityId, bool state);
 void toggle_HomeAssistant_switch_state(const String &entityId);
@@ -239,201 +180,83 @@ bool state1 = false;
 bool state2 = false;
 bool state3 = false;
 bool state4 = false;
+bool state5 = false;
+bool state6 = false;
+bool state7 = false;
+bool state8 = false;
 
 void loop() {
+    server.handleClient();
     tcp2uart.BridgeMainTask();
     ArduinoOTA.handle();
-/*
-    if (tcp2uart.uartMessageReceived == true) {
-        tcp2uart.uartMessageReceived = false;
-        if (tcp2uart.serialRxBuff[0] == '@' && // start of message
-            tcp2uart.serialRxBuff[1] == 'S' && // Slave response
-            tcp2uart.serialRxBuff[2] == 'P' && // Pressure
-            tcp2uart.serialRxBuff[3] == 'S' ) { // Sensor
-            for (int i = 5; i < 14; i++)
-                tcp2uart.serialRxBuff[i] -= 0x30;
-            pressure_A = tcp2uart.serialRxBuff[5] * 1000 + tcp2uart.serialRxBuff[6] * 100 + tcp2uart.serialRxBuff[7] * 10 + tcp2uart.serialRxBuff[8];
-            pressure_B = tcp2uart.serialRxBuff[10] * 1000 + tcp2uart.serialRxBuff[11] * 100 + tcp2uart.serialRxBuff[12] * 10 + tcp2uart.serialRxBuff[13];
-
-            if (pressure_average_count == 0) {
-                pressure_A_average_current = pressure_A;
-                pressure_B_average_current = pressure_B;
-                pressure_average_count = 1;
-            } else if (pressure_average_count == 10) {
-                pressure_average_count = 0;
-                pressure_A_average = pressure_A_average_current / 10;
-                pressure_B_average = pressure_B_average_current / 10;
-                pressure_A_average_current = 0;
-                pressure_B_average_current = 0;
-            } else {
-                pressure_average_count++;
-                pressure_A_average_current += pressure_A;
-                pressure_B_average_current += pressure_B;
-            }
-            
-        }
-    }
-    */
-    currTime = millis();
-
-
-/*
-    if (changed_A == 1) {
-        changed_A = 0;
-        //DOGM_LCD_setCursor(0, 4);
-        //DOGM_LCD_write12digitDec(count);
-        //DOGM_LCD_writeStr("000000000000");
-        display.setCursor(0, 0);
-        oled_LCD_write12digitDec(count_A, 10, 0);
-        display.setCursor(0, 16);
-        calcTotalDeciLiters_A = (count_A * 10) / pulsesLiter_A;
-        oled_LCD_write12digitDec(calcTotalDeciLiters_A, 9, 1);
-        update_display = 1;
-    }
-
-    if (changed_B == 1) {
-        changed_B = 0;
-        //DOGM_LCD_setCursor(0, 4);
-        //DOGM_LCD_write12digitDec(count);
-        //DOGM_LCD_writeStr("000000000000");
-        display.setCursor(68, 0);
-        oled_LCD_write12digitDec(count_B, 10, 0);
-        display.setCursor(68, 16);
-        calcTotalDeciLiters_B = (count_B * 10) / pulsesLiter_B;
-        oled_LCD_write12digitDec(calcTotalDeciLiters_B, 9, 1);
-        update_display = 1;
-    }
-
-    if (currTime - deltaTime_second >= 1000) {
-        deltaTime_second = currTime;
-        display.setCursor(0, 8);
-        oled_LCD_write12digitDec(pressure_A, 4, 0);
-        display.setCursor(36, 8);
-        oled_LCD_write12digitDec(pressure_A_average, 4, 0);
-        display.setCursor(68, 8);
-        oled_LCD_write12digitDec(pressure_B, 4, 0);
-        display.setCursor(104, 8);
-        oled_LCD_write12digitDec(pressure_B_average, 4, 0);
-
-        display.setCursor(30, 24);
-        calcFlow_A = ((count_A-count_A_old) * 10 * 60)/pulsesLiter_A;
-        oled_LCD_write12digitDec(calcFlow_A, 4, 1);
-        display.setCursor(98, 24);
-        calcFlow_B = ((count_B-count_B_old) * 10 * 60)/pulsesLiter_B;
-        oled_LCD_write12digitDec(calcFlow_B, 4, 1);
-
-        update_display = 1;
-        count_A_old = count_A;
-        count_B_old = count_B;
-    }
-    */
-    if (currTime - deltaTime_minute >= 30000) {
-        deltaTime_minute = currTime;
-/*
-        urlApi = "";
-        anyChanged = 0;
-        if (count_A != count_A_old2) {
-            count_A_old2 = count_A;
-            urlApi += "&field1=" + String(count_A);
-            anyChanged = 1;
-        }
-        if (count_B != count_B_old2) {
-            count_B_old2 = count_B;
-            urlApi += "&field2=" + String(count_B);
-            anyChanged = 1;
-        }
-        if (calcTotalDeciLiters_A != calcTotalDeciLiters_old_A) {
-            calcTotalDeciLiters_old_A = calcTotalDeciLiters_A;
-            urlApi += "&field3=" + String((float)calcTotalDeciLiters_A/10.0f, 1);
-            anyChanged = 1;
-        }
-        if (calcTotalDeciLiters_B != calcTotalDeciLiters_old_B) {
-            calcTotalDeciLiters_old_B = calcTotalDeciLiters_B;
-            urlApi += "&field4=" + String((float)calcTotalDeciLiters_B/10.0f, 1);
-            anyChanged = 1;
-        }
-        if (calcFlow_A != calcFlow_old_A) {
-            calcFlow_old_A = calcFlow_A;
-            urlApi += "&field5=" + String((float)calcFlow_A/10.0f, 1);
-            anyChanged = 1;
-        }
-        if (calcFlow_B != calcFlow_old_B) {
-            calcFlow_old_B = calcFlow_B;
-            urlApi += "&field6=" + String((float)calcFlow_B/10.0f, 1);
-            anyChanged = 1;
-        }
-        if (pressure_A_average != pressure_A_average_old) {
-            pressure_A_average_old = pressure_A_average;
-            urlApi += "&field7=" + String(pressure_A_average);
-            anyChanged = 1;
-        }
-        if (pressure_B_average != pressure_B_average_old) {
-            pressure_B_average_old = pressure_B_average;
-            urlApi += "&field8=" + String(pressure_B_average);
-            anyChanged = 1;
-        }
-
-        if (anyChanged == 1) {
-            String url = "http://api.thingspeak.com/update?api_key=FUP6M75ELGKWA2J8" + urlApi;
-            http.begin(client, url);
-            
-            int httpCode = http.GET();
-            if (httpCode > 0) {
-                DEBUG_UART.println(F("\r\nGET request sent\r\n"));
-                DEBUG_UART.println(urlApi);
-            }
-            else {
-                DEBUG_UART.println(F("\r\nGET request FAILURE\r\n"));
-                DEBUG_UART.println(urlApi);
-            }
-            http.end();
-        }*/
-    }
-    
-    if (update_display == 1) {
-        update_display = 0;
-        display.display();
-    }
-
 
     // read and write back to PCF8574A
     Wire.requestFrom(0x38, 1);
     keyState = Wire.read();
 
-    rawWrite = 0xFF; // lower nibble is allways key inputs
+    display.setCursor(0, 47);
+
+    //rawWrite = 0xFF; // lower nibble is allways key inputs
     if ((keyState & 0x01) == 0x01) {
-        rawWrite &= 0x7F; 
-        set_HomeAssistant_switch_state("switch.ytterbelysning_framsida_socket_1", state1);
+        //rawWrite &= 0x7F; 
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_framsida_socket_1", state1);
         state1 = !state1;
-    }
+        display.print("1 ");
+    } else display.print("0 ");
     if ((keyState & 0x02) == 0x02) {
-        rawWrite &= 0xBF;
-        set_HomeAssistant_switch_state("switch.ytterbelysning_baksida_socket_1", state2);
+        //rawWrite &= 0xBF;
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_baksida_socket_1", state2);
         state2 = !state2;
-    }
+        display.print("1 ");
+    } else display.print("0 ");
     if ((keyState & 0x04) == 0x04) {
-        rawWrite &= 0xDF;
-        set_HomeAssistant_switch_state("switch.ytterbelysning_kortsida_socket_1", state3);
+        //rawWrite &= 0xDF;
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_kortsida_socket_1", state3);
         state3 = !state3;
-    }
+        display.print("1 ");
+    } else display.print("0 ");
     if ((keyState & 0x08) == 0x08) {
-        rawWrite &= 0xEF;
-        toggle_HomeAssistant_switch_state("switch.vaxtbelysning_uppe_socket_1");
+        //rawWrite &= 0xEF;
+        state4 = !state4;
+        //toggle_HomeAssistant_switch_state("switch.vaxtbelysning_uppe_socket_1");
+        display.print("1 ");
+    } else display.print("0 ");
+    if ((keyState & 0x10) == 0x10) {
+        //rawWrite &= 0x7F; 
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_framsida_socket_1", state1);
+        state5 = !state5;
+        display.print("1 ");
+    } else display.print("0 ");
+    if ((keyState & 0x20) == 0x20) {
+        //rawWrite &= 0xBF;
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_baksida_socket_1", state2);
+        state6 = !state6;
+        display.print("1 ");
+    } else display.print("0 ");
+    if ((keyState & 0x40) == 0x40) {
+        //rawWrite &= 0xDF;
+        //set_HomeAssistant_switch_state("switch.ytterbelysning_kortsida_socket_1", state3);
+        state7 = !state7;
+        display.print("1 ");
+    } else display.print("0 ");
+    if ((keyState & 0x80) == 0x80) {
+        //rawWrite &= 0xEF;
+        state8 = !state8;
+        
+        //toggle_HomeAssistant_switch_state("switch.vaxtbelysning_uppe_socket_1");
+        display.print("1 ");
+    } else display.print("0 ");
+    //Wire.beginTransmission(0x38);
+    //Wire.write(rawWrite);
+    //Wire.endTransmission(0x38);
 
-    }
-    Wire.beginTransmission(0x38);
-    Wire.write(rawWrite);
-    Wire.endTransmission(0x38);
 
-/*
-    digitalWrite(DOGM_LCD_CS, LOW); // enable Slave Select
-    digitalWrite(DOGM_LCD_RS, LOW);
-    SPI.transfer(0xAA);
 
-    digitalWrite(DOGM_LCD_RS, HIGH);
-    SPI.transfer(0x55);
-    digitalWrite(DOGM_LCD_CS, HIGH); // disable Slave Select
-    */
+
+    //if (update_display == 1) {
+    //    update_display = 0;
+        display.display();
+    //}
 }
 
 void displayPrintHttpState(int httpCode)
@@ -524,16 +347,6 @@ void set_HomeAssistant_switch_state(const String &entityId, bool state)
     displayPrintHttpState(httpCode);
 }
 
-void ICACHE_RAM_ATTR waterMeter_A_ISR() {
-    changed_A = 1;
-    count_A++;
-}
-
-void ICACHE_RAM_ATTR waterMeter_B_ISR() {
-    changed_B = 1;
-    count_B++;
-}
-
 void oled_LCD_write12digitDec(uint32_t value, uint8_t maxDigits, uint8_t dotPos = 0) {
     uint32_t rest = value;
     uint32_t curr = rest / 100000000000;
@@ -594,12 +407,6 @@ void oled_LCD_write12digitDec(uint32_t value, uint8_t maxDigits, uint8_t dotPos 
     if (maxDigits >= 1)
         display.print(rest, 10);
 
-}
-
-void sendOneSpiByte(uint8_t data) {
-    digitalWrite(DOGM_LCD_CS, LOW); // enable chip Select
-    SPI.transfer(data);
-    digitalWrite(DOGM_LCD_CS, HIGH); // disable chip Select
 }
 
 void checkForUpdates(void)
@@ -665,22 +472,19 @@ void setup_BasicOTA()
           type = "filesystem";
 
         }
-
-
-
         // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
 
         DEBUG_UART.println(F("OTA Start\rOTA Progress: "));
 
-      });
+    });
 
-      ArduinoOTA.onEnd([]() {
+    ArduinoOTA.onEnd([]() {
 
         DEBUG_UART.println("\n100%\nOTA End");
 
-      });
+    });
 
-      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 
         //DEBUG_UART.printf("Progress: %u%%\r", (progress / (total / 100)));
         //Serial1.printf("%u%%\r", (progress / (total / 100)));
@@ -692,9 +496,9 @@ void setup_BasicOTA()
           otaPartProcentCount = 0;
           DEBUG_UART.printf(" %u%%\r", (progress / (total / 100)));
         }
-      });
+    });
 
-      ArduinoOTA.onError([](ota_error_t error) {
+    ArduinoOTA.onError([](ota_error_t error) {
         DEBUG_UART.printf("OTA Error");
         DEBUG_UART.printf("[%u]: ", error);
         if (error == OTA_AUTH_ERROR) DEBUG_UART.println(F("Auth Failed"));
@@ -702,13 +506,81 @@ void setup_BasicOTA()
         else if (error == OTA_CONNECT_ERROR) DEBUG_UART.println(F("Connect Failed"));
         else if (error == OTA_RECEIVE_ERROR) DEBUG_UART.println(F("Receive Failed"));
         else if (error == OTA_END_ERROR) DEBUG_UART.println(F("End Failed"));
-      });
+    });
 
-      ArduinoOTA.begin();
+    ArduinoOTA.begin();
 
-      DEBUG_UART.println("Ready");
+    DEBUG_UART.println("Ready");
 
-      DEBUG_UART.print("IP address: ");
+    DEBUG_UART.print("IP address: ");
 
-      DEBUG_UART.println(WiFi.localIP());
+    DEBUG_UART.println(WiFi.localIP());
+}
+
+void srv_handle_list_files()
+{
+    String str = "Files:\n";
+    Dir dir = LittleFS.openDir("/");
+    while (dir.next()) {
+        str += dir.fileName();
+        str += " / ";
+        str += dir.fileSize();
+        str += "\n";
+    }
+    server.send(200, "text/plain", str);
+}
+String getContentType(String filename) { // convert the file extension to the MIME type
+  if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".css")) return "text/css";
+  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".ico")) return "image/x-icon";
+  else if (filename.endsWith(".gz")) return "application/x-gzip";
+  return "text/plain";
+}
+bool handleFileRead(String path) { // send the right file to the client (if it exists)
+  Serial.println("handleFileRead: " + path);
+  if (path.endsWith("/")) path += "index.html";          // If a folder is requested, send the index file
+  String contentType = getContentType(path);             // Get the MIME type
+  String pathWithGz = path + ".gz";
+  if (LittleFS.exists(pathWithGz) || LittleFS.exists(path)) { // If the file exists, either as a compressed archive, or normal
+    if (LittleFS.exists(pathWithGz))                         // If there's a compressed version available
+      path += ".gz";                                         // Use the compressed verion
+    File file = LittleFS.open(path, "r");                    // Open the file
+    size_t sent = server.streamFile(file, contentType);    // Send it to the client
+    file.close();                                          // Close the file again
+    Serial.println(String("\tSent file: ") + path);
+    return true;
+  }
+  Serial.println(String("\tFile Not Found: ") + path);   // If the file doesn't exist, return false
+  return false;
+}
+
+bool load_from_file(String file_name, String &contents) {
+  contents = "";
+  
+  File this_file = LittleFS.open(file_name, "r");
+  if (!this_file) { // failed to open the file, retrn empty result
+    return false;
+  }
+  while (this_file.available()) {
+      contents += (char)this_file.read();
+  }
+  
+  this_file.close();
+  return true;
+}
+
+bool write_to_file(String file_name, String contents) {  
+  File this_file = LittleFS.open(file_name, "w");
+  if (!this_file) { // failed to open the file, return false
+    return false;
+  }
+  int bytesWritten = this_file.print(contents);
+ 
+  if (bytesWritten == 0) { // write failed
+      return false;
+  }
+   
+  this_file.close();
+  return true;
 }
