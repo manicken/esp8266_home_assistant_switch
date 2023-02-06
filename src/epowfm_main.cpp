@@ -26,11 +26,18 @@ static int otaPartProcentCount = 0;
 extern const char upload_html[];
 FSBrowser fsBrowser;
 
+enum SWITCH_MODE {
+    off = 0,
+    on = 1,
+    local_toggle = 2,
+    req_toggle = 3
+};
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-Adafruit_SSD1306 display(128, 64, &Wire, -1); // -1 = no reset pin
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // -1 = no reset pin
 
 #define DEBUG_UART Serial1
 
@@ -71,31 +78,27 @@ bool write_to_file(String file_name, String contents);
 bool load_from_file(String file_name, String &contents);
 
 
-DynamicJsonDocument jsonDoc(1024);
+DynamicJsonDocument jsonDoc_settings(1024);
+String jsonStr_settings = "";
 
 #define HOME_ASSISTANT_SETTINGS_FILENAME "/ha/settings.json"
 
 bool loadHomeAssistantSettings()
 {
-    String json = "";
-    if (!load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, json))
+    if (!load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings))
     {
-        jsonDoc["count"] = 8;
-        jsonDoc["authorization"] = F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ");
-        jsonDoc["server"] = F("http://192.168.1.107:8123/api/states/");
-        jsonDoc["items"][0]["id"] = "item1";
-        jsonDoc["items"][1]["id"] = "item2";
-        jsonDoc["items"][2]["id"] = "item3";
-        jsonDoc["items"][3]["id"] = "item4";
-        jsonDoc["items"][4]["id"] = "item5";
-        jsonDoc["items"][5]["id"] = "item6";
-        jsonDoc["items"][6]["id"] = "item7";
-        jsonDoc["items"][7]["id"] = "item8";
-        serializeJsonPretty(jsonDoc, json);
-        write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, json);
+        jsonDoc_settings["count"] = 8;
+        jsonDoc_settings["authorization"] = F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ");
+        jsonDoc_settings["server"] = F("http://192.168.1.107:8123");
+        for (int i=0;i<8;i++) {
+            jsonDoc_settings["items"][i]["id"] = "item1";
+            jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::local_toggle;
+        }
+        serializeJsonPretty(jsonDoc_settings, jsonStr_settings);
+        write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings);
         return false;
     }
-    deserializeJson(jsonDoc, json);
+    deserializeJson(jsonDoc_settings, jsonStr_settings);
     return true;
 }
 
@@ -167,7 +170,7 @@ void setup() {
     server.begin(HTTP_PORT);
 }
 
-uint8_t keyState = 0;
+uint8_t keyStates = 0;
 uint8_t keyStateOld = 0;
 uint8_t ledState = 0;
 uint8_t rawWrite = 0;
@@ -175,15 +178,11 @@ uint8_t update_display = 0;
 
 void set_HomeAssistant_switch_state(const String &entityId, bool state);
 void toggle_HomeAssistant_switch_state(const String &entityId);
+bool checkKeyState(uint8_t states, int nr);
 
-bool state1 = false;
-bool state2 = false;
-bool state3 = false;
-bool state4 = false;
-bool state5 = false;
-bool state6 = false;
-bool state7 = false;
-bool state8 = false;
+bool local_states[8] = {false, false, false, false, false, false, false, false};
+
+bool keys_pressed[8] = {false, false, false, false, false, false, false, false};
 
 void loop() {
     server.handleClient();
@@ -192,71 +191,60 @@ void loop() {
 
     // read and write back to PCF8574A
     Wire.requestFrom(0x38, 1);
-    keyState = Wire.read();
+    keyStates = Wire.read();
 
     display.setCursor(0, 47);
 
-    //rawWrite = 0xFF; // lower nibble is allways key inputs
-    if ((keyState & 0x01) == 0x01) {
-        //rawWrite &= 0x7F; 
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_framsida_socket_1", state1);
-        state1 = !state1;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x02) == 0x02) {
-        //rawWrite &= 0xBF;
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_baksida_socket_1", state2);
-        state2 = !state2;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x04) == 0x04) {
-        //rawWrite &= 0xDF;
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_kortsida_socket_1", state3);
-        state3 = !state3;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x08) == 0x08) {
-        //rawWrite &= 0xEF;
-        state4 = !state4;
-        //toggle_HomeAssistant_switch_state("switch.vaxtbelysning_uppe_socket_1");
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x10) == 0x10) {
-        //rawWrite &= 0x7F; 
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_framsida_socket_1", state1);
-        state5 = !state5;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x20) == 0x20) {
-        //rawWrite &= 0xBF;
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_baksida_socket_1", state2);
-        state6 = !state6;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x40) == 0x40) {
-        //rawWrite &= 0xDF;
-        //set_HomeAssistant_switch_state("switch.ytterbelysning_kortsida_socket_1", state3);
-        state7 = !state7;
-        display.print("1 ");
-    } else display.print("0 ");
-    if ((keyState & 0x80) == 0x80) {
-        //rawWrite &= 0xEF;
-        state8 = !state8;
-        
-        //toggle_HomeAssistant_switch_state("switch.vaxtbelysning_uppe_socket_1");
-        display.print("1 ");
-    } else display.print("0 ");
-    //Wire.beginTransmission(0x38);
-    //Wire.write(rawWrite);
-    //Wire.endTransmission(0x38);
+    for (int i = 0; i < 8; i++) {
+        if (keys_pressed[i] == false && checkKeyState(keyStates, i) == true)
+        {
+            keys_pressed[i] = true;
+            if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::local_toggle)
+            {
 
+            }
+            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::req_toggle)
+            {
 
+            }
+            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::on)
+            {
 
+            }
+            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::off)
+            {
 
-    //if (update_display == 1) {
-    //    update_display = 0;
-        display.display();
-    //}
+            }
+            display.print("1 ");
+        }
+        else if (keys_pressed[i] == true && checkKeyState(keyStates, i) == false)
+        {
+            keys_pressed[i] = false;
+            display.print("0 ");
+        }
+        else if (keys_pressed[i] == true)
+        {
+            display.print("1x");
+        }
+        else if (keys_pressed[i] == false)
+        {
+            display.print("0x");
+        }
+    }
+    display.display();
+}
+
+bool checkKeyState(uint8_t states, int nr)
+{
+    if (nr == 0 && (states & 0x01) == 0x01) return true;
+    else if (nr == 1 && (states & 0x02) == 0x02) return true;
+    else if (nr == 2 && (states & 0x04) == 0x04) return true;
+    else if (nr == 3 && (states & 0x08) == 0x08) return true;
+    else if (nr == 4 && (states & 0x10) == 0x10) return true;
+    else if (nr == 5 && (states & 0x20) == 0x20) return true;
+    else if (nr == 6 && (states & 0x40) == 0x40) return true;
+    else if (nr == 7 && (states & 0x80) == 0x80) return true;
+    return false;
 }
 
 void displayPrintHttpState(int httpCode)
@@ -276,12 +264,13 @@ void displayPrintHttpState(int httpCode)
 }
 void setHomeAssistantHttpHeader()
 {
-    http.addHeader("authorization", F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ"));
+    http.addHeader("authorization", jsonDoc_settings["authorization"] );//F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ"));
     http.addHeader("Content-Type", "application/json");
 }
 
 bool get_HomeAssistant_switch_state(const String &entityId) {
-    http.begin(client, F("http://192.168.1.107:8123/api/states/") + entityId);
+    String url = jsonDoc_settings["server"] + "/api/states/" + entityId;
+    http.begin(client, url);
     setHomeAssistantHttpHeader();
     int httpCode = http.GET();
     
@@ -333,9 +322,9 @@ void toggle_HomeAssistant_switch_state(const String &entityId)
 void set_HomeAssistant_switch_state(const String &entityId, bool state)
 {
     if (state == true)
-        http.begin(client, F("http://192.168.1.107:8123/api/services/switch/turn_on"));
+        http.begin(client, jsonDoc_settings["server"] + "/api/services/switch/turn_on");
     else
-        http.begin(client, F("http://192.168.1.107:8123/api/services/switch/turn_off"));
+        http.begin(client, jsonDoc_settings["server"] + "/api/services/switch/turn_off");
 
     setHomeAssistantHttpHeader();
 
