@@ -33,6 +33,10 @@ enum SWITCH_MODE {
     req_toggle = 3
 };
 
+char modes[] PROGMEM = R"=====(
+    ["OFF","ON","Local Toggle","Requested Toggle"]
+)=====";
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
@@ -99,6 +103,9 @@ void setup() {
     Wire.endTransmission(0x38);
 
     server.on("/listFiles", srv_handle_list_files);
+    server.on("/modes", []() {
+        server.send(200, "text/plain", modes);
+    });
     server.on("/formatLittleFs", []() { if (LittleFS.format()) server.send(200,"text/html", "Format OK"); else server.send(200,"text/html", "format Fail"); });
     server.onNotFound([]() {                              // If the client requests any URI
         if (!handleFileRead(server.uri()))                  // send it if it exists
