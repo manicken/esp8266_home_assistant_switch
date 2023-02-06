@@ -69,10 +69,11 @@ bool write_to_file(String file_name, String contents);
 bool load_from_file(String file_name, String &contents);
 
 void loadHomeAssistantSettings();
+void set_default_jsonDoc_settings_if_needed();
 void set_HomeAssistant_switch_state(const String &entityId, bool state);
 void toggle_HomeAssistant_switch_state(const String &entityId);
 bool checkKeyState(uint8_t states, int nr);
-void execKeyPress();
+void execKeyPress(int index);
 void keyTask();
 
 uint8_t keyStates_raw = 0;
@@ -102,6 +103,10 @@ void setup() {
     server.onNotFound([]() {                              // If the client requests any URI
         if (!handleFileRead(server.uri()))                  // send it if it exists
             server.send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
+    });
+    server.on("/ha/settings/load", []() {
+        loadHomeAssistantSettings();
+        server.send(200, "text/plain", "OK");
     });
     fsBrowser.setup(server); // this contains failsafe upload
     server.begin(HTTP_PORT);
@@ -201,6 +206,7 @@ void set_default_jsonDoc_settings_if_needed()
     }
     if (changed == true)
     {
+        jsonStr_settings = "";
         serializeJsonPretty(jsonDoc_settings, jsonStr_settings);
         write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings);
     }
@@ -239,21 +245,25 @@ void keyTask()
 
 void execKeyPress(int index)
 {
-    if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::local_toggle)
+    
+    if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::local_toggle)
     {
-
+        if (local_states[index]) local_states[index] = false;
+        else local_states[index] = true;
+        //local_states[index] = !local_states[index];
+        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], local_states[index]);
     }
-    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::req_toggle)
+    else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::req_toggle)
     {
-
+        toggle_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"]);
     }
-    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::on)
+    else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::on)
     {
-
+        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], true);
     }
-    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::off)
+    else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::off)
     {
-
+        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], false);
     }
 }
 
@@ -273,13 +283,13 @@ bool checkKeyState(uint8_t states, int nr)
 void displayPrintHttpState(int httpCode)
 {
     if (httpCode > 0) { // ok
-        display.setCursor(0,0);
+        display.setCursor(0,56);
         display.print(httpCode);
         display.print(" OK ");
     }
     else // fail
     {
-        display.setCursor(0,0);
+        display.setCursor(0,56);
         display.print(httpCode);
         display.print(" FAIL ");
     }
@@ -287,11 +297,14 @@ void displayPrintHttpState(int httpCode)
 }
 void setHomeAssistantHttpHeader()
 {
-    http.addHeader("authorization", jsonDoc_settings["authorization"] );//F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ"));
+    String auth = jsonDoc_settings["authorization"];
+    //DEBUG_UART.println(auth);
+    http.addHeader("authorization", auth );//F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ"));
     http.addHeader("Content-Type", "application/json");
 }
 
 bool get_HomeAssistant_switch_state(const String &entityId) {
+    
     String url = jsonDoc_settings["server"] + "/api/states/" + entityId;
     http.begin(client, url);
     setHomeAssistantHttpHeader();
@@ -344,10 +357,16 @@ void toggle_HomeAssistant_switch_state(const String &entityId)
 
 void set_HomeAssistant_switch_state(const String &entityId, bool state)
 {
+    String url = "";
     if (state == true)
-        http.begin(client, jsonDoc_settings["server"] + "/api/services/switch/turn_on");
+        url = jsonDoc_settings["server"] + "/api/services/switch/turn_on";
     else
-        http.begin(client, jsonDoc_settings["server"] + "/api/services/switch/turn_off");
+        url = jsonDoc_settings["server"] + "/api/services/switch/turn_off";
+
+    http.begin(client, url);
+    //DEBUG_UART.println("set_HomeAssistant_switch_state:");
+    //DEBUG_UART.println(url);
+    //DEBUG_UART.println(entityId);
 
     setHomeAssistantHttpHeader();
 
