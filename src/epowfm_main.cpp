@@ -43,31 +43,22 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // -1 = no res
 
 TCP2UART tcp2uart;
 
-
 // QUICKFIX...See https://github.com/esp8266/Arduino/issues/263
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 
-#define LED_PIN 5                       // 0 = GPIO0, 2=GPIO2
-#define LED_COUNT 50
-
 #define WIFI_TIMEOUT 30000              // checks WiFi every ...ms. Reset after this time, if WiFi cannot reconnect.
 #define HTTP_PORT 80
-
-unsigned long auto_last_change = 0;
-unsigned long last_wifi_check_time = 0;
 
 ESP8266WebServer server(HTTP_PORT);
 HTTPClient http;
 WiFiClient client;
 
-unsigned long currTime = 0;
-unsigned long deltaTime_second = 0;
-
 void printESP_info(void);
 void checkForUpdates(void);
 void setup_BasicOTA(void);
-void sendOneSpiByte(uint8_t data);
+void setup_display();
+void setup_wifi();
 
 void oled_LCD_write12digitDec(uint32_t value, uint8_t maxDigits, uint8_t dotPos);
 
@@ -77,61 +68,59 @@ String getContentType(String filename);
 bool write_to_file(String file_name, String contents);
 bool load_from_file(String file_name, String &contents);
 
+void loadHomeAssistantSettings();
+void set_HomeAssistant_switch_state(const String &entityId, bool state);
+void toggle_HomeAssistant_switch_state(const String &entityId);
+bool checkKeyState(uint8_t states, int nr);
+void execKeyPress();
+void keyTask();
 
-DynamicJsonDocument jsonDoc_settings(1024);
-String jsonStr_settings = "";
+uint8_t keyStates_raw = 0;
+bool local_states[8] = {false, false, false, false, false, false, false, false};
+bool keys_pressed[8] = {false, false, false, false, false, false, false, false};
 
-#define HOME_ASSISTANT_SETTINGS_FILENAME "/ha/settings.json"
-
-bool loadHomeAssistantSettings()
-{
-    if (!load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings))
-    {
-        jsonDoc_settings["count"] = 8;
-        jsonDoc_settings["authorization"] = F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ");
-        jsonDoc_settings["server"] = F("http://192.168.1.107:8123");
-        for (int i=0;i<8;i++) {
-            jsonDoc_settings["items"][i]["id"] = "item1";
-            jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::local_toggle;
-        }
-        serializeJsonPretty(jsonDoc_settings, jsonStr_settings);
-        write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings);
-        return false;
-    }
-    deserializeJson(jsonDoc_settings, jsonStr_settings);
-    return true;
-}
-
+/* ************* SETUP *******************/
 void setup() {
-    LittleFS.begin();
-
-    loadHomeAssistantSettings();
-
     DEBUG_UART.begin(115200);
     DEBUG_UART.println(F("\r\n!!!!!Start of MAIN Setup!!!!!\r\n"));
 
-
-    if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
-    {
-        delay(2000);
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-        delay(2000);
-        display.clearDisplay();
-        display.display();
-        display.setTextSize(1);
-        display.setTextColor(WHITE, BLACK);
-    }
-    else{
-        DEBUG_UART.println(F("oled init fail"));
-        if (display.begin(SSD1306_SWITCHCAPVCC, 0x3D))
-            DEBUG_UART.println(F("oled addr is 0x3D"));
-    }
-    
+    LittleFS.begin();
+    loadHomeAssistantSettings();
+    setup_display();
     printESP_info();
-    
+    setup_wifi();
+    //checkForUpdates();
+    setup_BasicOTA();
+    tcp2uart.begin();
+
+    Wire.beginTransmission(0x38);
+    Wire.write(0xFF); // all led off & all inputs
+    Wire.endTransmission(0x38);
+
+    server.on("/listFiles", srv_handle_list_files);
+    server.on("/formatLittleFs", []() { if (LittleFS.format()) server.send(200,"text/html", "Format OK"); else server.send(200,"text/html", "format Fail"); });
+    server.onNotFound([]() {                              // If the client requests any URI
+        if (!handleFileRead(server.uri()))                  // send it if it exists
+            server.send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
+    });
+    fsBrowser.setup(server); // this contains failsafe upload
+    server.begin(HTTP_PORT);
+
+    DEBUG_UART.println(F("\r\n!!!!!End of MAIN Setup!!!!!\r\n"));
+}
+
+/***************** LOOP *********************/
+void loop() {
+    server.handleClient();
+    tcp2uart.BridgeMainTask();
+    ArduinoOTA.handle();
+    keyTask();
+}
+
+void setup_wifi()
+{
     WiFiManager wifiManager;
     DEBUG_UART.println(F("trying to connect to saved wifi"));
-    
     display.setCursor(0, 0);
     display.println("WiFi connecting...");
     display.display();
@@ -147,77 +136,91 @@ void setup() {
         display.display();
     }
     //delay(2000);
-    //checkForUpdates();
-    setup_BasicOTA();
-    tcp2uart.begin();
-
-    //display.clearDisplay();
-   // display.display();
-
-    DEBUG_UART.println(F("\r\n!!!!!End of MAIN Setup!!!!!\r\n"));
-
-    Wire.beginTransmission(0x38);
-    Wire.write(0xFF); // all led off & all inputs
-    Wire.endTransmission(0x38);
-
-    server.on("/listFiles", srv_handle_list_files);
-    server.on("/formatLittleFs", []() { if (LittleFS.format()) server.send(200,"text/html", "Format OK"); else server.send(200,"text/html", "format Fail"); });
-    server.onNotFound([]() {                              // If the client requests any URI
-        if (!handleFileRead(server.uri()))                  // send it if it exists
-            server.send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
-    });
-    fsBrowser.setup(server); // this contains failsafe upload
-    server.begin(HTTP_PORT);
 }
 
-uint8_t keyStates = 0;
-uint8_t keyStateOld = 0;
-uint8_t ledState = 0;
-uint8_t rawWrite = 0;
-uint8_t update_display = 0;
+void setup_display()
+{
+    if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+    {
+        delay(2000);
+        display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+        delay(2000);
+        display.clearDisplay();
+        display.display();
+        display.setTextSize(1);
+        display.setTextColor(WHITE, BLACK);
+    }
+    else{
+        DEBUG_UART.println(F("oled init fail"));
+        if (display.begin(SSD1306_SWITCHCAPVCC, 0x3D))
+            DEBUG_UART.println(F("oled addr is 0x3D"));
+    }
+}
 
-void set_HomeAssistant_switch_state(const String &entityId, bool state);
-void toggle_HomeAssistant_switch_state(const String &entityId);
-bool checkKeyState(uint8_t states, int nr);
+DynamicJsonDocument jsonDoc_settings(1024);
+String jsonStr_settings = "";
+#define HOME_ASSISTANT_SETTINGS_FILENAME "/ha/settings.json"
+void loadHomeAssistantSettings()
+{
+    if (!load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings))
+    {
+        set_default_jsonDoc_settings_if_needed();
+    }
+    else
+    {
+        deserializeJson(jsonDoc_settings, jsonStr_settings);
+        set_default_jsonDoc_settings_if_needed();
+    }
+}
 
-bool local_states[8] = {false, false, false, false, false, false, false, false};
+void set_default_jsonDoc_settings_if_needed()
+{
+    bool changed = false;
+    if (jsonDoc_settings.containsKey("count") == false) {
+        jsonDoc_settings["count"] = 8;
+        changed = true;
+    }
+    if (jsonDoc_settings.containsKey("authorization") == false) {
+        jsonDoc_settings["authorization"] = "Bearer";
+        changed = true;
+    }
+    if (jsonDoc_settings.containsKey("server") == false) {
+        jsonDoc_settings["server"] = "";
+        changed = true;
+    }
 
-bool keys_pressed[8] = {false, false, false, false, false, false, false, false};
+    for (int i=0;i<8;i++) {
+        if (jsonDoc_settings["items"][i].containsKey("id") == false) {
+            jsonDoc_settings["items"][i]["id"] = "item1";
+            changed = true;
+        }
+        if (jsonDoc_settings["items"][i].containsKey("mode") == false) {
+            jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::local_toggle;
+            changed = true;
+        }
+    }
+    if (changed == true)
+    {
+        serializeJsonPretty(jsonDoc_settings, jsonStr_settings);
+        write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings);
+    }
+}
 
-void loop() {
-    server.handleClient();
-    tcp2uart.BridgeMainTask();
-    ArduinoOTA.handle();
-
-    // read and write back to PCF8574A
+void keyTask()
+{
     Wire.requestFrom(0x38, 1);
-    keyStates = Wire.read();
+    keyStates_raw = Wire.read();
 
     display.setCursor(0, 47);
 
     for (int i = 0; i < 8; i++) {
-        if (keys_pressed[i] == false && checkKeyState(keyStates, i) == true)
+        if (keys_pressed[i] == false && checkKeyState(keyStates_raw, i) == true)
         {
             keys_pressed[i] = true;
-            if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::local_toggle)
-            {
-
-            }
-            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::req_toggle)
-            {
-
-            }
-            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::on)
-            {
-
-            }
-            else if (jsonDoc_settings["items"][i]["mode"] == SWITCH_MODE::off)
-            {
-
-            }
+            execKeyPress(i);
             display.print("1 ");
         }
-        else if (keys_pressed[i] == true && checkKeyState(keyStates, i) == false)
+        else if (keys_pressed[i] == true && checkKeyState(keyStates_raw, i) == false)
         {
             keys_pressed[i] = false;
             display.print("0 ");
@@ -232,6 +235,26 @@ void loop() {
         }
     }
     display.display();
+}
+
+void execKeyPress(int index)
+{
+    if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::local_toggle)
+    {
+
+    }
+    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::req_toggle)
+    {
+
+    }
+    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::on)
+    {
+
+    }
+    else if (jsonDoc_settings["items"][index]["mode"] == SWITCH_MODE::off)
+    {
+
+    }
 }
 
 bool checkKeyState(uint8_t states, int nr)
