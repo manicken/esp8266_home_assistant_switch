@@ -29,12 +29,11 @@ FSBrowser fsBrowser;
 enum SWITCH_MODE {
     off = 0,
     on = 1,
-    local_toggle = 2,
-    req_toggle = 3
+    toggle = 2
 };
 
 char modes[] PROGMEM = R"=====(
-    ["OFF","ON","Local Toggle","Requested Toggle"]
+    ["Off","On","Toggle"]
 )=====";
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -74,8 +73,11 @@ bool load_from_file(String file_name, String &contents);
 
 void loadHomeAssistantSettings();
 void set_default_jsonDoc_settings_if_needed();
-void set_HomeAssistant_switch_state(const String &entityId, bool state);
-void toggle_HomeAssistant_switch_state(const String &entityId);
+
+void HomeAssistant_switch_state_turn_off(const String &entityId);
+void HomeAssistant_switch_state_turn_on(const String &entityId);
+void HomeAssistant_switch_state_toggle(const String &entityId);
+
 bool checkKeyState(uint8_t states, int nr);
 void execKeyPress(int index);
 void keyTask();
@@ -207,7 +209,7 @@ void set_default_jsonDoc_settings_if_needed()
             changed = true;
         }
         if (jsonDoc_settings["items"][i].containsKey("mode") == false) {
-            jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::local_toggle;
+            jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::toggle;
             changed = true;
         }
     }
@@ -252,25 +254,17 @@ void keyTask()
 
 void execKeyPress(int index)
 {
-    
-    if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::local_toggle)
+    if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::toggle)
     {
-        if (local_states[index]) local_states[index] = false;
-        else local_states[index] = true;
-        //local_states[index] = !local_states[index];
-        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], local_states[index]);
-    }
-    else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::req_toggle)
-    {
-        toggle_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"]);
+        HomeAssistant_switch_state_toggle(jsonDoc_settings["items"][index]["id"]);
     }
     else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::on)
     {
-        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], true);
+        HomeAssistant_switch_state_turn_on(jsonDoc_settings["items"][index]["id"]);
     }
     else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::off)
     {
-        set_HomeAssistant_switch_state(jsonDoc_settings["items"][index]["id"], false);
+        HomeAssistant_switch_state_turn_off(jsonDoc_settings["items"][index]["id"]);
     }
 }
 
@@ -354,26 +348,9 @@ bool get_HomeAssistant_switch_state(const String &entityId) {
     return false;
 }
 
-void toggle_HomeAssistant_switch_state(const String &entityId)
+void sendTo_HomeAssistant_api(const String &entityId, String url)
 {
-    if (get_HomeAssistant_switch_state(entityId) == true)
-        set_HomeAssistant_switch_state(entityId, false);
-    else
-        set_HomeAssistant_switch_state(entityId, true);
-}
-
-void set_HomeAssistant_switch_state(const String &entityId, bool state)
-{
-    String url = "";
-    if (state == true)
-        url = jsonDoc_settings["server"] + "/api/services/switch/turn_on";
-    else
-        url = jsonDoc_settings["server"] + "/api/services/switch/turn_off";
-
     http.begin(client, url);
-    //DEBUG_UART.println("set_HomeAssistant_switch_state:");
-    //DEBUG_UART.println(url);
-    //DEBUG_UART.println(entityId);
 
     setHomeAssistantHttpHeader();
 
@@ -383,6 +360,24 @@ void set_HomeAssistant_switch_state(const String &entityId, bool state)
     http.end();
 
     displayPrintHttpState(httpCode);
+}
+
+void HomeAssistant_switch_state_toggle(const String &entityId)
+{
+    String url = jsonDoc_settings["server"] + "/api/services/switch/toggle";
+    sendTo_HomeAssistant_api(entityId, url);
+}
+
+void HomeAssistant_switch_state_turn_on(const String &entityId)
+{
+    String url = jsonDoc_settings["server"] + "/api/services/switch/turn_on";
+    sendTo_HomeAssistant_api(entityId, url);
+}
+
+void HomeAssistant_switch_state_turn_off(const String &entityId)
+{
+    String url = jsonDoc_settings["server"] + "/api/services/switch/turn_off";
+    sendTo_HomeAssistant_api(entityId, url);
 }
 
 void oled_LCD_write12digitDec(uint32_t value, uint8_t maxDigits, uint8_t dotPos = 0) {

@@ -52,18 +52,26 @@ function fileLoaded(){
     
     var itemsHtml = "";
     for(var i=0;i<settings.items.length;i++) {
-      itemsHtml += '<label for="item' + i +'id">Item '+i+' ID:</label>';
+      itemsHtml += '<div class="item">';
+      itemsHtml += '<label class="itemlabel">Item '+(i+1)+'</label>';
+      itemsHtml += '<div class="item_part">';
+      itemsHtml += '<label for="item' + i +'id">ID:</label>';
       itemsHtml += '<input type="text" id="item' + i + 'id" name="item'+i+'id" value="'+settings.items[i].id+'">';
-      itemsHtml += '<br><br>';
-      itemsHtml += '<label for="item' + i +'mode">Item '+i+' Mode:</label>';
+      itemsHtml += '</div>';
+     // itemsHtml += '<br><br>';
+     itemsHtml += '<div class="item_part">';
+      itemsHtml += '<label for="item' + i +'mode">Mode:</label>';
       itemsHtml += '<select id="item' +i + 'mode">';
       itemsHtml += getOptionsHtml();
       itemsHtml += '</select>';
-      itemsHtml += '<br><br>';
+      itemsHtml += '</div>';
+      itemsHtml += '</div>';
     }
     document.getElementById("items").innerHTML = itemsHtml;
-    console.log(itemsHtml);
-    
+    //console.log(itemsHtml);
+    for(var i=0;i<settings.items.length;i++) {
+        document.getElementById("item"+i+"mode").value = settings.items[i].mode;
+    }
     /*
     document.getElementById("ledCount").value = settings.ledCount;
     document.getElementById("mode").value = settings.mode;
@@ -81,25 +89,28 @@ function fileLoaded(){
     else
       document.getElementById("LED_configuration").value = "RGB";
     */
-    console.log(settings);
+    //console.log(settings);
   }
 }
 
 function saveSettings()
 {
   var settings = {};
+  settings.count=8;
+  settings.authorization = document.getElementById("authorization").value ;
+  settings.server = document.getElementById("server").value;
+  settings.items = [];
   
-  settings.ledCount = document.getElementById("ledCount").value ;
-  settings.mode = document.getElementById("mode").value;
-  settings.color = document.getElementById("color").value;
-  settings.speed = document.getElementById("speed").value;
-  settings.brightness = document.getElementById("brightness").value;
-    
-  settings.IF_speed = document.getElementById("IF_speed").value;
-  settings.LED_configuration = document.getElementById("LED_configuration").value;
-  var settingsJSON = JSON.stringify(settings);
+  for (var i = 0;i<8;i++) {
+    settings.items[i] = {id:document.getElementById("item"+i+"id").value, 
+                         mode:parseInt(document.getElementById("item"+i+"mode").value)}
+  }
   
-  postFile("NeoStrip/settings.json", settingsJSON, "text/json")
+  var settingsJSON = JSON.stringify(settings,null, 4);
+  
+  //console.log(settingsJSON);
+  
+  postFile("ha/settings.json", settingsJSON, "text/json")
 }
 
 function setState(msg) {
