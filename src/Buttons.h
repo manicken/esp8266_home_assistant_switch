@@ -1,31 +1,63 @@
 #include <Arduino.h>
 #include <Adafruit_SSD1306.h>
+#include <ESP8266WebServer.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
 #include <Wire.h>
+#include "FileHelpers.h"
 
 #ifndef BUTTONS_H
 #define BUTTONS_H
 
-namespace Buttons {
+enum BTN_TARGET {
+    Local_Tuya = 0,
+    Home_Assistant = 1
+};
+enum BTN_EXEC_STATE {
+    Released = 0,
+    Pressed = 1,
+    Both = 2
+};
 
-    bool checkKeyState(int nr);
-    void keyTask();
+#define BUTTONS_JSON_FILENAME  "/btn/settings.json"
+#define JSON_NAME_TARGET            "target"
+#define JSON_NAME_TARGET_INDEX      "ti"
+#define JSON_NAME_BUTTON_EXEC_STATE "bes"
+
+namespace Buttons {
 
     uint8_t buttonStates_raw = 0;
     bool buttons_pressed[8] = {false, false, false, false, false, false, false, false};
 
+    ESP8266WebServer *server;
     Adafruit_SSD1306 *display;
+    DynamicJsonDocument jsonDoc(1024);
+    String jsonStr = "";
 
-    void (*buttonPressed_cb)(int);
-    void (*buttonReleased_cb)(int); // not used at the moment
+    bool checkKeyState(int nr);
+    void keyTask();
+    void loadJson();
+    void set_default_jsonDoc_properties_if_needed();
 
-    void setup(Adafruit_SSD1306 &_display, void(*buttonPressed_cb)(int))
+    // using callbacks as then homeassistant and localtuya don't need to be referenced here 
+    void (*homeAssistant_exec_cb)(int);
+    void (*localTuya_exec_cb)(int); 
+
+    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server, void(*homeAssistant_exec_cb)(int), void(*localTuya_exec_cb)(int))
     {
         display = &_display;
-        Buttons::buttonPressed_cb = buttonPressed_cb;
+        server = &_server;
+        Buttons::homeAssistant_exec_cb = homeAssistant_exec_cb;
+        Buttons::localTuya_exec_cb = localTuya_exec_cb;
 
         Wire.beginTransmission(0x38);
-        Wire.write(0xFF); // all led off & all inputs
+        Wire.write(0xFF); // all inputs
         Wire.endTransmission(0x38);
+
+        server->on("/btn/settings/load", []() {
+            loadJson();
+            server->send(200, "text/plain", "OK");
+        });
     }
 
     bool checkKeyState(int nr)
@@ -41,26 +73,44 @@ namespace Buttons {
         return false;
     }
 
+    void exec(int index) {
+        if (jsonDoc[index][JSON_NAME_TARGET] == (int)BTN_TARGET::Home_Assistant) {
+            if (homeAssistant_exec_cb != nullptr)
+                homeAssistant_exec_cb(jsonDoc[index][JSON_NAME_TARGET_INDEX]);
+        }
+        else if (jsonDoc[index][JSON_NAME_TARGET] == (int)BTN_TARGET::Local_Tuya) {
+            if (localTuya_exec_cb != nullptr)
+                localTuya_exec_cb(jsonDoc[index][JSON_NAME_TARGET_INDEX]);
+        }
+    }
+
     void keyTask()
     {
         Wire.requestFrom(0x38, 1);
         buttonStates_raw = Wire.read();
 
-        display->setCursor(0, 47);
-
         for (int i = 0; i < 8; i++) {
+            display->setCursor(i*6*2, 47);
             if (buttons_pressed[i] == false && checkKeyState(i) == true)
             {
                 buttons_pressed[i] = true;
-                if (buttonPressed_cb != nullptr)
-                    buttonPressed_cb(i);
+                if (jsonDoc[i][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Pressed ||
+                    jsonDoc[i][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
+                    exec(i);
+                }
+                //if (buttonPressed_cb != nullptr)
+                //    buttonPressed_cb(i);
                 display->print("1 ");
             }
             else if (buttons_pressed[i] == true && checkKeyState(i) == false)
             {
                 buttons_pressed[i] = false;
-                if (buttonReleased_cb != nullptr)
-                    buttonReleased_cb(i);
+                if (jsonDoc[i][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Released ||
+                    jsonDoc[i][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
+                    exec(i);
+                }
+                //if (buttonReleased_cb != nullptr)
+                //    buttonReleased_cb(i);
                 display->print("0 ");
             }
             // following are only for debug
@@ -74,6 +124,53 @@ namespace Buttons {
             }
         }
         display->display();
+    }
+
+    void loadJson()
+    {
+        if (!FileHelpers::load_from_file(BUTTONS_JSON_FILENAME, jsonStr))
+        {
+            set_default_jsonDoc_properties_if_needed();
+        }
+        else
+        {
+            deserializeJson(jsonDoc, jsonStr);
+            set_default_jsonDoc_properties_if_needed();
+        }
+    }
+
+    void set_default_jsonDoc_properties_if_needed()
+    {
+        bool changed = false;
+        for (int i=0;i<8;i++) {
+            if (jsonDoc[i] == nullptr)
+            {
+                jsonDoc[i][JSON_NAME_TARGET] = (int)BTN_TARGET::Home_Assistant;
+                jsonDoc[i][JSON_NAME_TARGET_INDEX] = i;
+                changed = true;
+            }
+            else
+            {
+                if (jsonDoc[i].containsKey(JSON_NAME_TARGET) == false) {
+                    jsonDoc[i][JSON_NAME_TARGET] = (int)BTN_TARGET::Home_Assistant;
+                    changed = true;
+                }
+                if (jsonDoc[i].containsKey(JSON_NAME_TARGET_INDEX) == false) {
+                    jsonDoc[i][JSON_NAME_TARGET_INDEX] = i;
+                    changed = true;
+                }
+                if (jsonDoc[i].containsKey(JSON_NAME_BUTTON_EXEC_STATE) == false) { 
+                    jsonDoc[i][JSON_NAME_BUTTON_EXEC_STATE] = (int)BTN_EXEC_STATE::Pressed;
+                    changed = true;
+                }
+            }
+        }
+        if (changed == true)
+        {
+            jsonStr = "";
+            serializeJsonPretty(jsonDoc, jsonStr);
+            FileHelpers::write_to_file(BUTTONS_JSON_FILENAME, jsonStr);
+        }
     }
 }
 #endif

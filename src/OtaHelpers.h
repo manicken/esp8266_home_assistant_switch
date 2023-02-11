@@ -62,14 +62,14 @@ void setup_BasicOTA()
 
         //DEBUG_UART.printf("Progress: %u%%\r", (progress / (total / 100)));
         //Serial1.printf("%u%%\r", (progress / (total / 100)));
-        DEBUG_UART.print("-");
+        /*DEBUG_UART.print("-");
         if (otaPartProcentCount < 10)
           otaPartProcentCount++;
         else
         {
           otaPartProcentCount = 0;
           DEBUG_UART.printf(" %u%%\r", (progress / (total / 100)));
-        }
+        }*/
     });
 
     ArduinoOTA.onError([](ota_error_t error) {

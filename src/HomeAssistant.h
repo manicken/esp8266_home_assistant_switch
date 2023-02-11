@@ -15,11 +15,12 @@ char modes[] PROGMEM = R"=====(
 )=====";
 
 enum SWITCH_MODE {
-    off = 0,
-    on = 1,
-    toggle = 2
+    off = (0),
+    on = (1),
+    toggle = (2)
 };
 
+#define HOME_ASSISTANT_JSON_FILENAME "/ha/settings.json"
 
 namespace HomeAssistant {
 
@@ -27,14 +28,16 @@ namespace HomeAssistant {
     Adafruit_SSD1306 *display;
     HTTPClient http;
     WiFiClient client;
+    DynamicJsonDocument jsonDoc(1024);
+    String jsonStr = "";
 
-    void execKeyPress(int index);
-    void loadHomeAssistantSettings();
-    void set_default_jsonDoc_settings_if_needed();
+    void exec(int index);
+    void loadJson();
+    void set_default_jsonDoc_properties_if_needed();
 
-    void HomeAssistant_switch_state_turn_off(const String &entityId);
-    void HomeAssistant_switch_state_turn_on(const String &entityId);
-    void HomeAssistant_switch_state_toggle(const String &entityId);
+    void switch_state_turn_off(const String &entityId);
+    void switch_state_turn_on(const String &entityId);
+    void switch_state_toggle(const String &entityId);
 
     void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server)
     {
@@ -45,80 +48,73 @@ namespace HomeAssistant {
             server->send(200, "text/plain", modes);
         });
         server->on("/ha/settings/load", []() {
-            loadHomeAssistantSettings();
+            loadJson();
             server->send(200, "text/plain", "OK");
         });
     }
     
-    DynamicJsonDocument jsonDoc_settings(1024);
-    String jsonStr_settings = "";
-    #define HOME_ASSISTANT_SETTINGS_FILENAME "/ha/settings.json"
-    void loadHomeAssistantSettings()
+    void loadJson()
     {
-        if (!FileHelpers::load_from_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings))
+        if (!FileHelpers::load_from_file(HOME_ASSISTANT_JSON_FILENAME, jsonStr))
         {
-            set_default_jsonDoc_settings_if_needed();
+            set_default_jsonDoc_properties_if_needed();
         }
         else
         {
-            deserializeJson(jsonDoc_settings, jsonStr_settings);
-            set_default_jsonDoc_settings_if_needed();
+            deserializeJson(jsonDoc, jsonStr);
+            set_default_jsonDoc_properties_if_needed();
         }
     }
 
-    void set_default_jsonDoc_settings_if_needed()
+    void set_default_jsonDoc_properties_if_needed()
     {
         bool changed = false;
-        if (jsonDoc_settings.containsKey("count") == false) {
-            jsonDoc_settings["count"] = 8;
+        if (jsonDoc.containsKey("authorization") == false) {
+            jsonDoc["authorization"] = "Bearer";
             changed = true;
         }
-        if (jsonDoc_settings.containsKey("authorization") == false) {
-            jsonDoc_settings["authorization"] = "Bearer";
-            changed = true;
-        }
-        if (jsonDoc_settings.containsKey("server") == false) {
-            jsonDoc_settings["server"] = "";
+        if (jsonDoc.containsKey("server") == false) {
+            jsonDoc["server"] = "";
             changed = true;
         }
 
         for (int i=0;i<8;i++) {
-            if (jsonDoc_settings["items"][i].containsKey("id") == false) {
-                jsonDoc_settings["items"][i]["id"] = "item1";
+            if (jsonDoc["items"][i].containsKey("id") == false) {
+                jsonDoc["items"][i]["id"] = "item1";
                 changed = true;
             }
-            if (jsonDoc_settings["items"][i].containsKey("mode") == false) {
-                jsonDoc_settings["items"][i]["mode"] = SWITCH_MODE::toggle;
+            if (jsonDoc["items"][i].containsKey("mode") == false) {
+                jsonDoc["items"][i]["mode"] = SWITCH_MODE::toggle;
                 changed = true;
             }
         }
         if (changed == true)
         {
-            jsonStr_settings = "";
-            serializeJsonPretty(jsonDoc_settings, jsonStr_settings);
-            FileHelpers::write_to_file(HOME_ASSISTANT_SETTINGS_FILENAME, jsonStr_settings);
+            jsonStr = "";
+            serializeJsonPretty(jsonDoc, jsonStr);
+            FileHelpers::write_to_file(HOME_ASSISTANT_JSON_FILENAME, jsonStr);
         }
     }
 
-    void execKeyPress(int index)
+    void exec(int index)
     {
-        if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::toggle)
+        if (jsonDoc["items"][index]["mode"] == (int)SWITCH_MODE::toggle)
         {
-            HomeAssistant_switch_state_toggle(jsonDoc_settings["items"][index]["id"]);
+            switch_state_toggle(jsonDoc["items"][index]["id"]);
         }
-        else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::on)
+        else if (jsonDoc["items"][index]["mode"] == (int)SWITCH_MODE::on)
         {
-            HomeAssistant_switch_state_turn_on(jsonDoc_settings["items"][index]["id"]);
+            switch_state_turn_on(jsonDoc["items"][index]["id"]);
         }
-        else if (jsonDoc_settings["items"][index]["mode"] == (int)SWITCH_MODE::off)
+        else if (jsonDoc["items"][index]["mode"] == (int)SWITCH_MODE::off)
         {
-            HomeAssistant_switch_state_turn_off(jsonDoc_settings["items"][index]["id"]);
+            switch_state_turn_off(jsonDoc["items"][index]["id"]);
         }
     }
 
     void setHomeAssistantHttpHeader()
     {
-        String auth = jsonDoc_settings["authorization"];
+        String auth = jsonDoc["authorization"];
         //DEBUG_UART.println(auth);
         http.addHeader("authorization", auth );//F("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIzN2NlMjg4ZGVkMWE0OTBhYmIzNDYxMDNiM2YzMzIzNCIsImlhdCI6MTY2OTkwNjI1OCwiZXhwIjoxOTg1MjY2MjU4fQ.XP-8H5PRQG6tJ8MBYmiN0I4djs-KpahZliTrnPTvlcQ"));
         http.addHeader("Content-Type", "application/json");
@@ -126,7 +122,7 @@ namespace HomeAssistant {
 
     bool get_HomeAssistant_switch_state(const String &entityId) {
         
-        String url = jsonDoc_settings["server"] + "/api/states/" + entityId;
+        String url = jsonDoc["server"] + "/api/states/" + entityId;
         http.begin(client, url);
         setHomeAssistantHttpHeader();
         int httpCode = http.GET();
@@ -182,21 +178,21 @@ namespace HomeAssistant {
         OLedHelpers::displayPrintHttpState(httpCode);
     }
 
-    void HomeAssistant_switch_state_toggle(const String &entityId)
+    void switch_state_toggle(const String &entityId)
     {
-        String url = jsonDoc_settings["server"] + "/api/services/switch/toggle";
+        String url = jsonDoc["server"] + "/api/services/switch/toggle";
         sendTo_HomeAssistant_api(entityId, url);
     }
 
-    void HomeAssistant_switch_state_turn_on(const String &entityId)
+    void switch_state_turn_on(const String &entityId)
     {
-        String url = jsonDoc_settings["server"] + "/api/services/switch/turn_on";
+        String url = jsonDoc["server"] + "/api/services/switch/turn_on";
         sendTo_HomeAssistant_api(entityId, url);
     }
 
-    void HomeAssistant_switch_state_turn_off(const String &entityId)
+    void switch_state_turn_off(const String &entityId)
     {
-        String url = jsonDoc_settings["server"] + "/api/services/switch/turn_off";
+        String url = jsonDoc["server"] + "/api/services/switch/turn_off";
         sendTo_HomeAssistant_api(entityId, url);
     }
 }

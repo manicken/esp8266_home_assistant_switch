@@ -21,6 +21,7 @@
 #include "Buttons.h"
 #include "HomeAssistant.h"
 #include "MainHelpers.h"
+#include "LocalTuya.h"
 
 FSBrowser fsBrowser;
 Adafruit_SSD1306 display(128, 64, &Wire, -1); // -1 = no reset pin
@@ -28,21 +29,32 @@ TCP2UART tcp2uart;
 ESP8266WebServer server(80);
 
 #define DEBUG_UART Serial1
-
+/*
+void execKeyPress(int index)
+{
+    //HomeAssistant::execKeyPress(index);
+    if (index < 4)
+        LocalTuya::exec(index, 1);
+    else
+        LocalTuya::exec(index-4, 0);
+}*/
 /*************** SETUP *******************/
 void setup() {
     DEBUG_UART.begin(115200);
     DEBUG_UART.println(F("\r\n!!!!!Start of MAIN Setup!!!!!\r\n"));
     LittleFS.begin();
-    HomeAssistant::loadHomeAssistantSettings();
+    Buttons::loadJson();
+    HomeAssistant::loadJson();
+    LocalTuya::loadJson();
     OLedHelpers::setup(display);
     MainHelpers::setup(display);
     MainHelpers::printESP_info();
     MainHelpers::setup_wifi();
     //OtaHelpers::checkForUpdates(client);
     OtaHelpers::setup_BasicOTA();
-    Buttons::setup(display, HomeAssistant::execKeyPress);
+    Buttons::setup(display, server, HomeAssistant::exec, LocalTuya::exec);
     HomeAssistant::setup(display, server);
+    LocalTuya::setup(display, server);
     FileHelpers::setup(server);
     fsBrowser.setup(server); // this contains failsafe upload
     server.begin();
