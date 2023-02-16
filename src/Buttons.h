@@ -120,14 +120,14 @@ namespace Buttons {
             for (int bi=0;bi<8;bi++) { // bit index
                 btnIndex = ci*8+bi;
                 display->setCursor(bi*6*2, 32+8*ci);
-                if (raw == 0x01 && buttons_pressed[btnIndex] == false) {
+                if ((raw & 0x01) == 0x01 && buttons_pressed[btnIndex] == false) {
                     buttons_pressed[btnIndex] = true;
                     if (jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Pressed ||
                         jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
                         exec(btnIndex);
                     }
                     display->print("1 ");
-                } else if (raw == 0x00 && buttons_pressed[btnIndex] == true) {
+                } else if ((raw & 0x01) == 0x00 && buttons_pressed[btnIndex] == true) {
                     buttons_pressed[btnIndex] = false;
                     if (jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Released ||
                         jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
