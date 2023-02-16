@@ -30,17 +30,19 @@ namespace MainHelpers {
         WiFiManager wifiManager;
         DEBUG_UART.println(F("trying to connect to saved wifi"));
         display->setCursor(0, 0);
-        display->println("WiFi connecting...");
+        display->print("WiFi connecting...");
         display->display();
         if (wifiManager.autoConnect() == true) { // using ESP.getChipId() internally
-            display->setCursor(0, 9);
-            display->println("OK");
-            display->setCursor(0, 17);
-            display->println(WiFi.localIP());
+            display->setCursor(0, 8);
+            display->print("OK");
+            display->setCursor(0, 0);
+            display->print("                  ");
+            display->setCursor(0, 0);
+            display->print(WiFi.localIP());
             display->display();
         } else {
-            display->setCursor(0, 9);
-            display->println("FAIL");
+            display->setCursor(0, 8);
+            display->print("FAIL");
             display->display();
         }
         //delay(2000);

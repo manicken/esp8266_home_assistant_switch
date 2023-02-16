@@ -43,9 +43,7 @@ void setup() {
     DEBUG_UART.begin(115200);
     DEBUG_UART.println(F("\r\n!!!!!Start of MAIN Setup!!!!!\r\n"));
     LittleFS.begin();
-    Buttons::loadJson();
-    HomeAssistant::loadJson();
-    LocalTuya::loadJson();
+    
     OLedHelpers::setup(display);
     MainHelpers::setup(display);
     MainHelpers::printESP_info();

@@ -51,6 +51,7 @@ namespace HomeAssistant {
             loadJson();
             server->send(200, "text/plain", "OK");
         });
+        loadJson();
     }
     
     void loadJson()

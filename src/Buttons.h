@@ -9,7 +9,10 @@
 #ifndef BUTTONS_H
 #define BUTTONS_H
 
+#define DEBUG_UART Serial1
+
 enum BTN_TARGET {
+    None = -1,
     Local_Tuya = 0,
     Home_Assistant = 1
 };
@@ -27,11 +30,14 @@ enum BTN_EXEC_STATE {
 namespace Buttons {
 
     uint8_t buttonStates_raw = 0;
-    bool buttons_pressed[8] = {false, false, false, false, false, false, false, false};
+    bool buttons_pressed[64];
 
     ESP8266WebServer *server;
-    Adafruit_SSD1306 *display;
+    Adafruit_SSD1306 *display; // mostly used for debug
     DynamicJsonDocument jsonDoc(1024);
+    uint buttonCount = 0;
+    int nrOfChips = 0;
+    
     String jsonStr = "";
 
     bool checkKeyState(int nr);
@@ -50,14 +56,30 @@ namespace Buttons {
         Buttons::homeAssistant_exec_cb = homeAssistant_exec_cb;
         Buttons::localTuya_exec_cb = localTuya_exec_cb;
 
-        Wire.beginTransmission(0x38);
-        Wire.write(0xFF); // all inputs
-        Wire.endTransmission(0x38);
-
         server->on("/btn/settings/load", []() {
             loadJson();
             server->send(200, "text/plain", "OK");
         });
+        loadJson();
+
+        // right now we use static size (@ max button count)
+        for (int i=0;i<64;i++) buttons_pressed[i] = false;
+
+        if (buttonCount <= 8) nrOfChips = 1;
+        else if (buttonCount <= 16) nrOfChips = 2;
+        else if (buttonCount <= 24) nrOfChips = 3;
+        else if (buttonCount <= 32) nrOfChips = 4;
+        else if (buttonCount <= 40) nrOfChips = 5;
+        else if (buttonCount <= 48) nrOfChips = 6;
+        else if (buttonCount <= 56) nrOfChips = 7;
+        else nrOfChips = 8; // max number of pcf8574 that can be on one i2c bus
+
+        // init all pcf8574:s 
+        for (int i=0;i<nrOfChips;i++) {
+            Wire.beginTransmission(0x38+i);
+            Wire.write(0xFF); // all inputs
+            Wire.endTransmission();
+        }
     }
 
     bool checkKeyState(int nr)
@@ -82,14 +104,53 @@ namespace Buttons {
             if (localTuya_exec_cb != nullptr)
                 localTuya_exec_cb(jsonDoc[index][JSON_NAME_TARGET_INDEX]);
         }
+        else if (jsonDoc[index][JSON_NAME_TARGET] == (int)BTN_TARGET::None) {
+            // doing nothing
+        }
     }
 
     void keyTask()
     {
+        uint8_t raw = 0;
+        int btnIndex = 0;
+        for (int ci=0;ci<nrOfChips;ci++) { // chip index
+            Wire.requestFrom(0x38+ci, 1);
+            raw = Wire.read();
+
+            for (int bi=0;bi<8;bi++) { // bit index
+                btnIndex = ci*8+bi;
+                display->setCursor(bi*6*2, 32+8*ci);
+                if (raw == 0x01 && buttons_pressed[btnIndex] == false) {
+                    buttons_pressed[btnIndex] = true;
+                    if (jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Pressed ||
+                        jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
+                        exec(btnIndex);
+                    }
+                    display->print("1 ");
+                } else if (raw == 0x00 && buttons_pressed[btnIndex] == true) {
+                    buttons_pressed[btnIndex] = false;
+                    if (jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Released ||
+                        jsonDoc[btnIndex][JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
+                        exec(btnIndex);
+                    }
+                    display->print("0 ");
+                } else if (buttons_pressed[btnIndex] == true) {
+                    display->print("1x");
+                } else if (buttons_pressed[btnIndex] == false) {
+                    display->print("0x");
+                }
+                
+                raw = raw >> 1;
+            }
+        }
+        display->display();
+    /*
         Wire.requestFrom(0x38, 1);
         buttonStates_raw = Wire.read();
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < buttonCount; i++)
+        {
+
             display->setCursor(i*6*2, 47);
             if (buttons_pressed[i] == false && checkKeyState(i) == true)
             {
@@ -124,6 +185,7 @@ namespace Buttons {
             }
         }
         display->display();
+        */
     }
 
     void loadJson()
@@ -141,9 +203,12 @@ namespace Buttons {
 
     void set_default_jsonDoc_properties_if_needed()
     {
+        buttonCount = jsonDoc.size();
+        OLedHelpers::printAt(0,24,buttonCount);
+
         bool changed = false;
-        for (int i=0;i<8;i++) {
-            if (jsonDoc[i] == nullptr)
+        for (int i=0;i<(int)buttonCount;i++) {
+            if (jsonDoc[i] == nullptr) // should never happen
             {
                 jsonDoc[i][JSON_NAME_TARGET] = (int)BTN_TARGET::Home_Assistant;
                 jsonDoc[i][JSON_NAME_TARGET_INDEX] = i;
@@ -165,6 +230,8 @@ namespace Buttons {
                 }
             }
         }
+        
+
         if (changed == true)
         {
             jsonStr = "";

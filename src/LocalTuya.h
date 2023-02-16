@@ -47,6 +47,7 @@ namespace LocalTuya
             loadJson();
             server->send(200, "text/plain", "OK");
         });
+        loadJson();
     }
 
     void exec(int index)

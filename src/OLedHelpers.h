@@ -120,5 +120,20 @@ namespace OLedHelpers
         }
         display->display();
     }
+
+    void printAt(uint x, uint y, const Printable & cp) { display->setCursor(x, y); display->print(cp); }
+    void printAt(uint x, uint y, char c) { display->setCursor(x, y); display->print(c); }
+    void printAt(uint x, uint y, const char cca[]) { display->setCursor(x, y); display->print(cca); }
+    void printAt(uint x, uint y, const String &cs) { display->setCursor(x, y); display->print(cs); }
+    void printAt(uint x, uint y, const __FlashStringHelper* ifsh) { display->setCursor(x, y); display->print(ifsh); }
+    void printAt(uint x, uint y, double dv, int vt = 2) { display->setCursor(x, y); display->print(dv, vt); }
+    void printAt(uint x, uint y, unsigned long long ullv, int vt = 10) { display->setCursor(x, y); display->print(ullv, vt); }
+    void printAt(uint x, uint y, long long llv, int vt = 10) { display->setCursor(x, y); display->print(llv, vt); }
+    void printAt(uint x, uint y, unsigned long ulv, int vt = 10) { display->setCursor(x, y); display->print(ulv, vt); }
+    void printAt(uint x, uint y, long lv, int vt = 10) { display->setCursor(x, y); display->print(lv, vt); }
+    void printAt(uint x, uint y, unsigned int uiv, int vt = 10) { display->setCursor(x, y); display->print(uiv, vt); }
+    void printAt(uint x, uint y, int iv, int vt = 10) { display->setCursor(x, y); display->print(iv, vt); }
+    void printAt(uint x, uint y, unsigned char uc, int vt = 10) { display->setCursor(x, y); display->print(uc, vt); }
+
 }
 #endif
