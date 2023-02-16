@@ -45,7 +45,7 @@ namespace HomeAssistant {
     void loadJson();
     void set_default_jsonDoc_properties_if_needed();
 
-    void api_services_switch(const String &id, String mode);
+    void api_services_switch(const String &mode, const String &id);
 
     void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server)
     {
@@ -93,16 +93,6 @@ namespace HomeAssistant {
         if (jsonDoc.containsKey(HA_JSON_NAME_EXEC) == false) {DEBUG_UART.print("ha json error cannot find "); DEBUG_UART.println(HA_JSON_NAME_EXEC); canExec = false; }
         if (jsonDoc.containsKey(HA_JSON_NAME_ENTITIES) == false)  {DEBUG_UART.print("ha json error cannot find "); DEBUG_UART.println(HA_JSON_NAME_ENTITIES); canExec = false; }
 
-        /*for (int i=0;i<8;i++) {
-            if (jsonDoc["items"][i].containsKey("id") == false) {
-                jsonDoc["items"][i]["id"] = "item1";
-                changed = true;
-            }
-            if (jsonDoc["items"][i].containsKey("mode") == false) {
-                jsonDoc["items"][i]["mode"] = SWITCH_MODE::toggle;
-                changed = true;
-            }
-        }*/
         if (changed == true)
         {
             jsonStr = "";
@@ -115,11 +105,11 @@ namespace HomeAssistant {
     {
         if (canExec == false) {DEBUG_UART.println("cannot exec ha"); return; }
 
-        if (jsonDoc[HA_JSON_NAME_EXEC][index].containsKey(HA_JSON_NAME_ENTITY_INDEX) == false)  {DEBUG_UART.print("ha exec cannot find field "); DEBUG_UART.println(HA_JSON_NAME_ENTITY_INDEX); return; }
+        if (jsonDoc[HA_JSON_NAME_EXEC][index].containsKey(HA_JSON_NAME_ENTITY_INDEX) == false) { DEBUG_UART.print("ha exec cannot find field "); DEBUG_UART.println(HA_JSON_NAME_ENTITY_INDEX); return; }
         String ei = jsonDoc[HA_JSON_NAME_EXEC][index][HA_JSON_NAME_ENTITY_INDEX];
-        if (jsonDoc[HA_JSON_NAME_ENTITIES].containsKey(ei) == false)  {DEBUG_UART.print("ha exec cannot find entity @ index:"); DEBUG_UART.println(ei); return; }
+        if (jsonDoc[HA_JSON_NAME_ENTITIES].containsKey(ei) == false) { DEBUG_UART.print("ha exec cannot find entity @ index:"); DEBUG_UART.println(ei); return; }
         String id = jsonDoc[HA_JSON_NAME_ENTITIES][ei];
-        if (jsonDoc[HA_JSON_NAME_EXEC][index].containsKey(HA_JSON_NAME_EXEC_MODE) == false)  {DEBUG_UART.print("ha exec cannot find field "); DEBUG_UART.println(HA_JSON_NAME_EXEC_MODE); return; }
+        if (jsonDoc[HA_JSON_NAME_EXEC][index].containsKey(HA_JSON_NAME_EXEC_MODE) == false) { DEBUG_UART.print("ha exec cannot find field "); DEBUG_UART.println(HA_JSON_NAME_EXEC_MODE); return; }
         int mode = jsonDoc[HA_JSON_NAME_EXEC][index][HA_JSON_NAME_EXEC_MODE];
         
         if (debug) {
@@ -201,7 +191,7 @@ namespace HomeAssistant {
         return false;
     }
 
-    void api_services_switch(const String &id, String mode)
+    void api_services_switch(const String &mode, const String &id)
     {
         String url = jsonDoc[HA_JSON_NAME_SERVER] + "/api/services/switch/" + mode;
         http.begin(client, url);
