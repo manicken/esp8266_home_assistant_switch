@@ -34,18 +34,18 @@
     font-size:12px;
     color:#BBB;
     display: inline-block;
-    width: 50px;
+    width: 75px;
   }
   
   .item input {
     padding-left:5px;
       font-size:14px;
-      width: 500px;
+      width: 20px;
       left:150px;
   }
   .item select{
       font-size:14px;
-      width: 100px;
+      width: 75px;
       left:150px;
   }
   #mode {
@@ -71,7 +71,7 @@
     border-color:#AAA;
     padding:5px;
     margin:10px;
-    width:100%;
+    width:200px;
     height:55px;
   }
   
@@ -119,6 +119,16 @@
     top:-15px;
     background-color:#202020;
   }
+  
+  .row:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+  .column {
+    float: left;
+    width: 50%;
+  }
 
   
   </style>
@@ -135,9 +145,12 @@
     <label for="server">Server:</label>
     <input type="text" id="server" name="server">
   </div>
-    <div id="items"></div>
-    
+    <div class="row">
+      <div class="column" id="execTable"></div>
+      <div class="column" id="entityTable"></div>
+    </div>
     <button type="button" onclick="saveSettings()">Save</button>
+    <button type="button" onclick="getSwitchEntities()">get Switch Entities</button>
     
     <div id='info'></div>
     

@@ -1,0 +1,81 @@
+[
+  {
+    "target": 1,
+    "ti": 0,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 1,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 2,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 3,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 4,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 5,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 6,
+    "bes": 1
+  },
+  {
+    "target": 1,
+    "ti": 7,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 8,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 9,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 10,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 11,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 12,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 13,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 14,
+    "bes": 1
+  },
+  {
+    "target": -1,
+    "ti": 15
+  }
+]
