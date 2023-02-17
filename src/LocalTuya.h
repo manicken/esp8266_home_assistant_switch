@@ -10,31 +10,29 @@
 #ifndef LOCAL_TUYA_H
 #define LOCAL_TUYA_H
 
+#define LOCAL_TUYA_JSONDOC_SIZE 2048
 #define LOCAL_TUYA_JSON_FILENAME "/tuya/settings.json"
-#define JSON_NAME_DEVICES     "devices"
-#define JSON_NAME_DEVICE_ID   "id"
-#define JSON_NAME_DEVICE_KEY  "key"
-#define JSON_NAME_DEVICE_HOST "host"
-#define JSON_NAME_EXECLIST    "exec"
-#define JSON_NAME_EXEC_DEVICE_INDEX "di"
-#define JSON_NAME_EXEC_MODE   "mode"
-/*
-enum TUYA_MODE {
-    off = 0,
-    on = 1,
-    toggle = 2
-};*/
+#define LT_JSON_NAME_DEVICES     "devices"
+#define LT_JSON_NAME_DEVICE_ID   "id"
+#define LT_JSON_NAME_DEVICE_KEY  "key"
+#define LT_JSON_NAME_DEVICE_HOST "host"
 
 namespace LocalTuya
 {
+    enum SWITCH_MODE {
+        off = (0),
+        on = (1),
+        toggle = (2)
+    };
+
     ESP8266WebServer *server;
     Adafruit_SSD1306 *display;
     TuyaDevice plug;
-    DynamicJsonDocument jsonDoc(1024);
+    DynamicJsonDocument jsonDoc(LOCAL_TUYA_JSONDOC_SIZE);
     String jsonStr = "";
 
     void setup(ESP8266WebServer &_server);
-    void exec(int index);
+    void exec(int index, int mode);
     void loadJson();
     void set_default_jsonDoc_properties_if_needed();
 
@@ -50,66 +48,46 @@ namespace LocalTuya
         loadJson();
     }
 
-    void exec(int index)
+    void exec(int index, int mode)
     {
-        // failsafes
-        if (jsonDoc[JSON_NAME_EXECLIST][index] == nullptr) {
-            return;
-        }
-        if (jsonDoc[JSON_NAME_EXECLIST][index][JSON_NAME_EXEC_DEVICE_INDEX] == nullptr) {
-            return;
-        }
-        if (jsonDoc[JSON_NAME_EXECLIST][index][JSON_NAME_EXEC_MODE] == nullptr) {
-            return;
-        }
-
-        
-        int mode = jsonDoc[JSON_NAME_EXECLIST][index][JSON_NAME_EXEC_MODE];
-        int device_index = jsonDoc[JSON_NAME_EXECLIST][index][JSON_NAME_EXEC_DEVICE_INDEX];
-
         display->setCursor(0,26);
         display->print("                ");
         display->setCursor(0,26);
-        /*if (index > (jsonDoc.size()-1)) {
+        
+        if (jsonDoc[LT_JSON_NAME_DEVICES][index] == nullptr) {
             display->print(index);
-            display->print(">");
-            display->print(jsonDoc.size());
-
-            return;
-        }*/
-        if (jsonDoc[JSON_NAME_DEVICES][device_index] == nullptr) {
-            display->print(device_index);
             display->print(" device index not found");
             return;
         }
-        if (jsonDoc[JSON_NAME_DEVICES][device_index]["id"] == nullptr) {
+        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_ID] == nullptr) {
             display->print(" device id not found");
             return;
         }
-        if (jsonDoc[JSON_NAME_DEVICES][device_index]["key"] == nullptr) {
+        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_KEY] == nullptr) {
             display->print(" device key not found");
             return;
         }
-        if (jsonDoc[JSON_NAME_DEVICES][device_index]["host"] == nullptr) {
+        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_HOST] == nullptr) {
             display->print(" device host not found");
             return;
         }
         tuya_error_t err;
-        plug.begin(jsonDoc[JSON_NAME_DEVICES][device_index][JSON_NAME_DEVICE_ID], 
-                   jsonDoc[JSON_NAME_DEVICES][device_index][JSON_NAME_DEVICE_KEY],
-                   jsonDoc[JSON_NAME_DEVICES][device_index][JSON_NAME_DEVICE_HOST]);
-         //plug.get();
-        if (mode == 0)
+        plug.begin(jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_ID], 
+                   jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_KEY],
+                   jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_HOST]);
+        
+        if (mode == (int)SWITCH_MODE::off)
             err = plug.set(false);
-        else if (mode == 1)
+        else if (mode == (int)SWITCH_MODE::on)
             err = plug.set(true);
-        else
+        else if (mode == (int)SWITCH_MODE::toggle)
             err = plug.toggle();
+
         if (err == tuya_error_t::TUYA_OK)
             display->print("OK");
         else {
             display->print(err);
-             display->print(plug.response);
+            display->print(plug.response);
         }
             
     }
