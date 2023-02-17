@@ -51,15 +51,15 @@ function fileLoaded(){
     document.getElementById("server").value = settings.server;
     
     var itemsHtml = "";
-    for(var i=0;i<settings.items.length;i++) {
+    for(var i=0;i<settings.exec.length;i++) {
       itemsHtml += '<div class="item">';
       itemsHtml += '<label class="itemlabel">Item '+(i+1)+'</label>';
       itemsHtml += '<div class="item_part">';
-      itemsHtml += '<label for="item' + i +'id">ID:</label>';
-      itemsHtml += '<input type="text" id="item' + i + 'id" name="item'+i+'id" value="'+settings.items[i].id+'">';
+      itemsHtml += '<label for="execitem' + i +'id">Entity Index:</label>';
+      itemsHtml += '<input type="text" id="execitem' + i + 'id" name="execitem'+i+'id" value="'+settings.exec[i].ei+'">';
       itemsHtml += '</div>';
      // itemsHtml += '<br><br>';
-     itemsHtml += '<div class="item_part">';
+      itemsHtml += '<div class="item_part">';
       itemsHtml += '<label for="item' + i +'mode">Mode:</label>';
       itemsHtml += '<select id="item' +i + 'mode">';
       itemsHtml += getOptionsHtml();
@@ -67,11 +67,34 @@ function fileLoaded(){
       itemsHtml += '</div>';
       itemsHtml += '</div>';
     }
-    document.getElementById("items").innerHTML = itemsHtml;
+    document.getElementById("execTable").innerHTML = itemsHtml;
     //console.log(itemsHtml);
-    for(var i=0;i<settings.items.length;i++) {
-        document.getElementById("item"+i+"mode").value = settings.items[i].mode;
+    for(var i=0;i<settings.exec.length;i++) {
+        document.getElementById("item"+i+"mode").value = settings.exec[i].mode;
     }
+    
+    itemsHtml = "";
+    var keys = Object.keys(settings.entities);
+    for(var i=0;i<keys.length;i++) {
+      var entity = settings.entities[keys[i]];
+      itemsHtml += '<div class="item">';
+      itemsHtml += '<label class="itemlabel">Item '+(i+1)+'</label>';
+      itemsHtml += '<div class="item_part">';
+      itemsHtml += '<label for="Entityitem' + i +'id">Entity Index:</label>';
+      itemsHtml += '<input type="text" id="Entityitem' + i + 'id" name="Entityitem'+i+'id" value="'+keys[i]+'">';
+      itemsHtml += '</div>';
+     // itemsHtml += '<br><br>';
+      itemsHtml += '<div class="item_part">';
+      itemsHtml += '<label for="item' + i +'id">Id:</label>';
+      
+      itemsHtml += '<input type="text" id="item' + i + 'id" name="item'+i+'id" value="'+entity+'">';
+      //itemsHtml += '<select id="item' +i + 'id">';
+      //itemsHtml += getOptionsHtml();
+      //itemsHtml += '</select>';
+      itemsHtml += '</div>';
+      itemsHtml += '</div>';
+    }
+    document.getElementById("entityTable").innerHTML = itemsHtml;
     /*
     document.getElementById("ledCount").value = settings.ledCount;
     document.getElementById("mode").value = settings.mode;
@@ -91,6 +114,28 @@ function fileLoaded(){
     */
     //console.log(settings);
   }
+}
+
+function getSwitchEntities() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+         if (this.readyState == 4 && this.status == 200) {
+           var json = JSON.parse(this.responseText);
+           var switches = [];
+           for (var i = 0; i < json.length; i++) {
+             if (json[i].entity_id.startsWith("switch"))
+                switches.push(json[i].entity_id);
+           }
+           console.log(switches);
+             //alert(this.responseText);
+         }
+    };
+    xhttp.open("GET", "http://192.168.1.180:8123/api/states", true);
+    xhttp.setRequestHeader("Content-type", "application/json");
+    xhttp.setRequestHeader("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiNzVlMzI2NTg0OWE0YTYxOGUwMTM2MjBlMmM0MGVhMiIsImlhdCI6MTY3NjI5OTQxNCwiZXhwIjoxOTkxNjU5NDE0fQ.p3VeuB3M8Gulv-K52X_aDaDfYjxRi8wD3YrNooxAQZ4");
+    //xhttp.setRequestHeader("Access-Control-Allow-Origin", "Origin, Accept, X-Requested-With, Content-type, Authorization");
+    xhttp.send("");
+
 }
 
 function saveSettings()
