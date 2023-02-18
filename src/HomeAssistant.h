@@ -12,8 +12,8 @@
 #define HOMEASSISTANT_H
 
 #define HA_JSONDOC_SIZE 2048
-#define HOME_ASSISTANT_JSON_FILENAME "/ha/settings.json"
-#define HOME_ASSISTANT_JSON_LOAD_URL "/ha/settings/load"
+#define HOME_ASSISTANT_JSON_FILENAME "/ha/cfg.json"
+#define HOME_ASSISTANT_JSON_LOAD_URL "/ha/cfg/load"
 #define HA_JSON_NAME_DEBUG         "debug"
 #define HA_JSON_NAME_AUTHORIZATION "authorization"
 #define HA_JSON_NAME_SERVER        "server"
@@ -100,21 +100,15 @@ namespace HomeAssistant {
             DEBUG_UART.println(id);
             DEBUG_UART.print("mode:");
             DEBUG_UART.println(mode);
-            return;
+            //return;
         }
 
         if (mode == (int)SWITCH_MODE::toggle)
-        {
             api_services_switch(id, "toggle");
-        }
         else if (mode == (int)SWITCH_MODE::on)
-        {
             api_services_switch(id, "turn_on");
-        }
         else if (mode == (int)SWITCH_MODE::off)
-        {
             api_services_switch(id, "turn_off");
-        }
     }
 
     void setHomeAssistantHttpHeader()
@@ -169,16 +163,23 @@ namespace HomeAssistant {
         return false;
     }
 
-    void api_services_switch(const String &mode, const String &id)
+    void api_services_switch(const String &id,const String &mode)
     {
         String url = jsonDoc[HA_JSON_NAME_SERVER] + "/api/services/switch/" + mode;
         http.begin(client, url);
+
+        if (debug) {
+            DEBUG_UART.println(url);
+            DEBUG_UART.println(id);
+        }
+
 
         setHomeAssistantHttpHeader();
 
         int httpCode = 0;
 
         httpCode = http.POST("{\"entity_id\":\"switch."+id+"\"}");
+        
         http.end();
 
         OLedHelpers::displayPrintHttpState(httpCode);

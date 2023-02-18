@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Adafruit_SSD1306.h>
 #include <ESP8266WebServer.h>
+#include "WebSocketHelper.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
@@ -12,8 +13,8 @@
 #define DEBUG_UART Serial1
 
 #define BUTTONS_JSONDOC_SIZE 2048
-#define BUTTONS_JSON_FILENAME           "/btn/settings.json"
-#define BUTTONS_JSON_LOAD_URL           "/btn/settings/load"
+#define BUTTONS_JSON_FILENAME           "/btn/cfg.json"
+#define BUTTONS_JSON_LOAD_URL           "/btn/cfg/load"
 #define BUTTONS_GET_MODE_URL            "/modes"
 #define BUTTONS_GET_TARGETS_URL         "/targets"
 #define BTN_JSON_NAME_TARGET            "target"
@@ -51,6 +52,7 @@ namespace Buttons {
     bool buttons_pressed[64];
 
     ESP8266WebServer *server;
+    //WebSocketsServer *webSocket;
     Adafruit_SSD1306 *display; // mostly used for debug
     DynamicJsonDocument jsonDoc(BUTTONS_JSONDOC_SIZE);
     uint buttonCount = 0;
@@ -67,10 +69,11 @@ namespace Buttons {
     void (*homeAssistant_exec_cb)(int,int);
     void (*localTuya_exec_cb)(int,int); 
 
-    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server, void(*homeAssistant_exec_cb)(int,int), void(*localTuya_exec_cb)(int,int))
+    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server,/*WebSocketsServer &_webSocket, */void(*homeAssistant_exec_cb)(int,int), void(*localTuya_exec_cb)(int,int))
     {
         display = &_display;
         server = &_server;
+        //webSocket = &_webSocket;
         Buttons::homeAssistant_exec_cb = homeAssistant_exec_cb;
         Buttons::localTuya_exec_cb = localTuya_exec_cb;
 
@@ -107,15 +110,26 @@ namespace Buttons {
     }
 
     void exec(int index) {
-        if (jsonDoc[index][BTN_JSON_NAME_TARGET] == (int)BTN_TARGET::Home_Assistant) {
+        
+        int target = jsonDoc[index][BTN_JSON_NAME_TARGET];
+        int targetIndex = jsonDoc[index][BTN_JSON_NAME_TARGET_INDEX];
+        int targetMode = jsonDoc[index][BTN_JSON_NAME_TARGET_MODE];
+
+        String toSend = "button index:"; toSend.concat(index);
+        toSend.concat("\ntarget:"); toSend.concat(target);
+        toSend.concat("\ntarget index:"); toSend.concat(targetIndex);
+        toSend.concat("\ntarget mode:"); toSend.concat(targetMode);
+        WebSocketHelper::sendText(toSend);
+        
+        if (target == (int)BTN_TARGET::Home_Assistant) {
             if (homeAssistant_exec_cb != nullptr)
-                homeAssistant_exec_cb(jsonDoc[index][BTN_JSON_NAME_TARGET_INDEX], jsonDoc[index][BTN_JSON_NAME_TARGET_MODE]);
+                homeAssistant_exec_cb(targetIndex, targetMode);
         }
-        else if (jsonDoc[index][BTN_JSON_NAME_TARGET] == (int)BTN_TARGET::Local_Tuya) {
+        else if (target == (int)BTN_TARGET::Local_Tuya) {
             if (localTuya_exec_cb != nullptr)
-                localTuya_exec_cb(jsonDoc[index][BTN_JSON_NAME_TARGET_INDEX], jsonDoc[index][BTN_JSON_NAME_TARGET_MODE]);
+                localTuya_exec_cb(targetIndex, targetMode);
         }
-        else if (jsonDoc[index][BTN_JSON_NAME_TARGET] == (int)BTN_TARGET::None) {
+        else if (target == (int)BTN_TARGET::None) {
             // doing nothing
         }
     }

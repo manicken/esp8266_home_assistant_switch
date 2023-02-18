@@ -11,8 +11,8 @@
 #define LOCAL_TUYA_H
 
 #define LOCAL_TUYA_JSONDOC_SIZE 2048
-#define LOCAL_TUYA_JSON_FILENAME "/tuya/settings.json"
-#define LT_JSON_NAME_DEVICES     "devices"
+#define LOCAL_TUYA_JSON_FILENAME "/tuya/cfg.json"
+#define LOCAL_TUYA_JSON_LOAD_URL "/tuya/cfg/load"
 #define LT_JSON_NAME_DEVICE_ID   "id"
 #define LT_JSON_NAME_DEVICE_KEY  "key"
 #define LT_JSON_NAME_DEVICE_HOST "host"
@@ -41,7 +41,7 @@ namespace LocalTuya
         display = &_display;
         server = &_server;
 
-        server->on("/tuya/settings/load", []() {
+        server->on(LOCAL_TUYA_JSON_LOAD_URL, []() {
             loadJson();
             server->send(200, "text/plain", "OK");
         });
@@ -54,27 +54,27 @@ namespace LocalTuya
         display->print("                ");
         display->setCursor(0,26);
         
-        if (jsonDoc[LT_JSON_NAME_DEVICES][index] == nullptr) {
+        if (jsonDoc[index] == nullptr) {
             display->print(index);
             display->print(" device index not found");
             return;
         }
-        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_ID] == nullptr) {
+        if (jsonDoc[index][LT_JSON_NAME_DEVICE_ID] == nullptr) {
             display->print(" device id not found");
             return;
         }
-        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_KEY] == nullptr) {
+        if (jsonDoc[index][LT_JSON_NAME_DEVICE_KEY] == nullptr) {
             display->print(" device key not found");
             return;
         }
-        if (jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_HOST] == nullptr) {
+        if (jsonDoc[index][LT_JSON_NAME_DEVICE_HOST] == nullptr) {
             display->print(" device host not found");
             return;
         }
         tuya_error_t err;
-        plug.begin(jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_ID], 
-                   jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_KEY],
-                   jsonDoc[LT_JSON_NAME_DEVICES][index][LT_JSON_NAME_DEVICE_HOST]);
+        plug.begin(jsonDoc[index][LT_JSON_NAME_DEVICE_ID], 
+                   jsonDoc[index][LT_JSON_NAME_DEVICE_KEY],
+                   jsonDoc[index][LT_JSON_NAME_DEVICE_HOST]);
         
         if (mode == (int)SWITCH_MODE::off)
             err = plug.set(false);

@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<title>Home Assistant WiFi Switch - Settings</title>
+<script type='text/javascript' src='main.js'></script>
+<link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+
+<body>
+  <div class="Menu">
+    <div class="MenuItem"><a href="../../index.html"><button type="button" style="width:170px;">back to MainMenu</button></a></div>
+    <div class="MenuItem"><button type="button" onclick="saveConfiguration()" style="width:75px; font-weight:bold;">save</button></div>
+    <div class="MenuItem"><button type="button" onclick="loadConfiguration()" style="width:75px; font-weight:bold;">reload</button></div>
+  </div>
+  <div class='other_items'>
+    <label for="authorization">Authorization:</label>
+    <input type="text" id="authorization" name="authorization">
+  </div>
+  <div class='other_items'>
+    <label for="server">Server:</label>
+    <input type="text" id="server" name="server">
+  </div>
+  <table id="dataTable">
+    
+  </table>
+  <div id='info'></div>
+</body>
+</html>

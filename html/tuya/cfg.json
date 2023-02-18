@@ -1,0 +1,5 @@
+[
+  {"id":"id_1","key":"localKey1","host":"192.168.1.x"},
+  {"id":"id_2","key":"localKey2","host":"192.168.1.x"},
+  {"id":"id_3","key":"localKey3","host":"192.168.1.x"}
+]

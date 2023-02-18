@@ -1,0 +1,12 @@
+{
+  "authorization": "Bearer",
+  "authorization2": "Bearer",
+  "server": "http://homeassistant.local:8123",
+  "server2": "http://192.168.1.x:8123",
+  "entities": [
+    "deltaco_sh_p01_6_socket_1",
+    "deltaco_sh_p01_7_socket_1",
+    "deltaco_sh_p01_8_socket_1",
+    "test_switch"
+  ]
+}
