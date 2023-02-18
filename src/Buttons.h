@@ -15,6 +15,7 @@
 #define BUTTONS_JSON_FILENAME           "/btn/settings.json"
 #define BUTTONS_JSON_LOAD_URL           "/btn/settings/load"
 #define BUTTONS_GET_MODE_URL            "/modes"
+#define BUTTONS_GET_TARGETS_URL         "/targets"
 #define BTN_JSON_NAME_TARGET            "target"
 #define BTN_JSON_NAME_TARGET_INDEX      "ti"
 #define BTN_JSON_NAME_TARGET_MODE       "tm"
@@ -26,10 +27,14 @@ namespace Buttons {
         ["Off","On","Toggle"]
     )=====";
 
+    char targets[] PROGMEM = R"=====(
+        ["None","Local Tuya","Home Assistant"]
+    )=====";
+
     enum BTN_TARGET {
-        None = -1,
-        Local_Tuya = 0,
-        Home_Assistant = 1
+        None = 0,
+        Local_Tuya = 1,
+        Home_Assistant = 2
     };
     enum BTN_EXEC_STATE {
         Released = 0,
@@ -71,6 +76,9 @@ namespace Buttons {
 
         server->on(BUTTONS_GET_MODE_URL, []() {
             server->send(200, "text/plain", modes);
+        });
+        server->on(BUTTONS_GET_TARGETS_URL, []() {
+            server->send(200, "text/plain", targets);
         });
         server->on(BUTTONS_JSON_LOAD_URL, []() {
             loadJson();
