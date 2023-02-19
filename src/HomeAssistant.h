@@ -7,6 +7,7 @@
 #include <ESP8266WebServer.h>
 #include "FileHelpers.h"
 #include "OLedHelpers.h"
+#include "Main.h"
 
 #ifndef HOMEASSISTANT_H
 #define HOMEASSISTANT_H
@@ -27,8 +28,6 @@ namespace HomeAssistant {
         toggle = (2)
     };
 
-    ESP8266WebServer *server;
-    Adafruit_SSD1306 *display;
     HTTPClient http;
     WiFiClient client;
     DynamicJsonDocument jsonDoc(HA_JSONDOC_SIZE);
@@ -41,14 +40,11 @@ namespace HomeAssistant {
 
     void api_services_switch(const String &mode, const String &id);
 
-    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server)
+    void setup()
     {
-        display = &_display;
-        server = &_server;
-
-        server->on(HOME_ASSISTANT_JSON_LOAD_URL, []() {
+        Main::webServer.on(HOME_ASSISTANT_JSON_LOAD_URL, []() {
             loadJson();
-            server->send(200, "text/plain", "OK");
+            Main::webServer.send(200, "text/plain", "OK");
         });
         loadJson();
     }
@@ -141,17 +137,17 @@ namespace HomeAssistant {
             JsonObject obj = doc.as<JsonObject>();
 
             if (obj == NULL) {
-                display->setCursor(0,8);
-                display->print("json obj null");
-                display->display();
+                Main::display.setCursor(0,8);
+                Main::display.print("json obj null");
+                Main::display.display();
                 return false;
             }
             String state = obj["state"];
 
             if (state == NULL) {
-                display->setCursor(0,8);
-                display->print("json state var null");
-                display->display();
+                Main::display.setCursor(0,8);
+                Main::display.print("json state var null");
+                Main::display.display();
                 return false;
             } 
             if (state == "ON") return true;
@@ -172,19 +168,12 @@ namespace HomeAssistant {
             DEBUG_UART.println(url);
             DEBUG_UART.println(id);
         }
-
-
         setHomeAssistantHttpHeader();
-
         int httpCode = 0;
-
         httpCode = http.POST("{\"entity_id\":\"switch."+id+"\"}");
-        
         http.end();
-
         OLedHelpers::displayPrintHttpState(httpCode);
     }
-
 }
 
 #endif

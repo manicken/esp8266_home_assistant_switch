@@ -16,34 +16,28 @@
 
 namespace MainHelpers {
 
-    Adafruit_SSD1306 *display;
     void printESP_info(void);
     void setup_wifi();
-
-    void setup(Adafruit_SSD1306 &_display)
-    {
-        display = &_display;
-    }
 
     void setup_wifi()
     {
         WiFiManager wifiManager;
         DEBUG_UART.println(F("trying to connect to saved wifi"));
-        display->setCursor(0, 0);
-        display->print("WiFi connecting...");
-        display->display();
+        Main::display.setCursor(0, 0);
+        Main::display.print("WiFi connecting...");
+        Main::display.display();
         if (wifiManager.autoConnect() == true) { // using ESP.getChipId() internally
-            display->setCursor(0, 8);
-            display->print("OK");
-            display->setCursor(0, 0);
-            display->print("                  ");
-            display->setCursor(0, 0);
-            display->print(WiFi.localIP());
-            display->display();
+            Main::display.setCursor(0, 8);
+            Main::display.print("OK");
+            Main::display.setCursor(0, 0);
+            Main::display.print("                  ");
+            Main::display.setCursor(0, 0);
+            Main::display.print(WiFi.localIP());
+            Main::display.display();
         } else {
-            display->setCursor(0, 8);
-            display->print("FAIL");
-            display->display();
+            Main::display.setCursor(0, 8);
+            Main::display.print("FAIL");
+            Main::display.display();
         }
         //delay(2000);
     }

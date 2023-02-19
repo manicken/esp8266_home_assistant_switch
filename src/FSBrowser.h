@@ -20,6 +20,11 @@
 
   See readme.md for more information.
 */
+/*
+  modified by github.com/manicken
+  to use namespace instead of class
+  and to use Main::webServer
+*/
 
 ////////////////////////////////
 
@@ -49,8 +54,8 @@ const char FILE_NOT_FOUND[] PROGMEM = "FileNotFound";
 extern const char upload_html[];
 
 
-class FSBrowser {
-public:
+namespace FSBrowser {
+//public:
 
     
 #ifdef INCLUDE_FALLBACK_INDEX_HTM
@@ -78,11 +83,11 @@ SDFSConfig fileSystemConfig = SDFSConfig();
 #endif
 
 
-#define DBG_OUTPUT_PORT Serial
+#define DBG_OUTPUT_PORT Serial1
 
 
 
-    ESP8266WebServer *server = nullptr;
+    //ESP8266WebServer *server = nullptr;
 
     
 
@@ -97,25 +102,25 @@ File uploadFile;
 
 
 void replyOK() {
-  server->send(200, FPSTR(TEXT_PLAIN), "");
+  Main::webServer.send(200, FPSTR(TEXT_PLAIN), "");
 }
 
 void replyOKWithMsg(String msg) {
-  server->send(200, FPSTR(TEXT_PLAIN), msg);
+  Main::webServer.send(200, FPSTR(TEXT_PLAIN), msg);
 }
 
 void replyNotFound(String msg) {
-  server->send(404, FPSTR(TEXT_PLAIN), msg);
+  Main::webServer.send(404, FPSTR(TEXT_PLAIN), msg);
 }
 
 void replyBadRequest(String msg) {
   DBG_OUTPUT_PORT.println(msg);
-  server->send(400, FPSTR(TEXT_PLAIN), msg + "\r\n");
+  Main::webServer.send(400, FPSTR(TEXT_PLAIN), msg + "\r\n");
 }
 
 void replyServerError(String msg) {
   DBG_OUTPUT_PORT.println(msg);
-  server->send(500, FPSTR(TEXT_PLAIN), msg + "\r\n");
+  Main::webServer.send(500, FPSTR(TEXT_PLAIN), msg + "\r\n");
 }
 
 #ifdef USE_SPIFFS
@@ -162,7 +167,7 @@ void handleStatus() {
   json += unsupportedFiles;
   json += "\"}";
 
-  server->send(200, "application/json", json);
+  Main::webServer.send(200, "application/json", json);
 }
 
 
@@ -173,9 +178,9 @@ void handleStatus() {
 void handleFileList() {
   if (!fsOK) { return replyServerError(FPSTR(FS_INIT_ERROR)); }
 
-  if (!server->hasArg("dir")) { return replyBadRequest(F("DIR ARG MISSING")); }
+  if (!Main::webServer.hasArg("dir")) { return replyBadRequest(F("DIR ARG MISSING")); }
 
-  String path = server->arg("dir");
+  String path = Main::webServer.arg("dir");
   if (path != "/" && !fileSystem->exists(path)) { return replyBadRequest("BAD PATH"); }
 
   DBG_OUTPUT_PORT.println(String("handleFileList: ") + path);
@@ -183,8 +188,8 @@ void handleFileList() {
   path.clear();
 
   // use HTTP/1.1 Chunked response to avoid building a huge temporary string
-  if (!server->chunkedResponseModeStart(200, "text/json")) {
-    server->send(505, F("text/html"), F("HTTP1.1 required"));
+  if (!Main::webServer.chunkedResponseModeStart(200, "text/json")) {
+    Main::webServer.send(505, F("text/html"), F("HTTP1.1 required"));
     return;
   }
 
@@ -202,7 +207,7 @@ void handleFileList() {
     if (output.length()) {
       // send string from previous iteration
       // as an HTTP chunk
-      server->sendContent(output);
+      Main::webServer.sendContent(output);
       output = ',';
     } else {
       output = '[';
@@ -229,8 +234,8 @@ void handleFileList() {
 
   // send last string
   output += "]";
-  server->sendContent(output);
-  server->chunkedResponseFinalize();
+  Main::webServer.sendContent(output);
+  Main::webServer.chunkedResponseFinalize();
 }
 
 
@@ -247,7 +252,7 @@ bool handleFileRead(String path) {
   if (path.endsWith("/")) { path += "index.htm"; }
 
   String contentType;
-  if (server->hasArg("download")) {
+  if (Main::webServer.hasArg("download")) {
     contentType = F("application/octet-stream");
   } else {
     contentType = mime::getContentType(path);
@@ -259,7 +264,7 @@ bool handleFileRead(String path) {
   }
   if (fileSystem->exists(path)) {
     File file = fileSystem->open(path, "r");
-    if (server->streamFile(file, contentType) != file.size()) { DBG_OUTPUT_PORT.println("Sent less data than expected!"); }
+    if (Main::webServer.streamFile(file, contentType) != file.size()) { DBG_OUTPUT_PORT.println("Sent less data than expected!"); }
     file.close();
     return true;
   }
@@ -298,7 +303,7 @@ String lastExistingParent(String path) {
 void handleFileCreate() {
   if (!fsOK) { return replyServerError(FPSTR(FS_INIT_ERROR)); }
 
-  String path = server->arg("path");
+  String path = Main::webServer.arg("path");
   if (path.isEmpty()) { return replyBadRequest(F("PATH ARG MISSING")); }
 
 #ifdef USE_SPIFFS
@@ -308,7 +313,7 @@ void handleFileCreate() {
   if (path == "/") { return replyBadRequest("BAD PATH"); }
   if (fileSystem->exists(path)) { return replyBadRequest(F("PATH FILE EXISTS")); }
 
-  String src = server->arg("src");
+  String src = Main::webServer.arg("src");
   if (src.isEmpty()) {
     // No source specified: creation
     DBG_OUTPUT_PORT.println(String("handleFileCreate: ") + path);
@@ -383,7 +388,7 @@ void deleteRecursive(String path) {
 void handleFileDelete() {
   if (!fsOK) { return replyServerError(FPSTR(FS_INIT_ERROR)); }
 
-  String path = server->arg(0);
+  String path = Main::webServer.arg(0);
   if (path.isEmpty() || path == "/") { return replyBadRequest("BAD PATH"); }
 
   DBG_OUTPUT_PORT.println(String("handleFileDelete: ") + path);
@@ -398,8 +403,8 @@ void handleFileDelete() {
 */
 void handleFileUpload() {
   if (!fsOK) { return replyServerError(FPSTR(FS_INIT_ERROR)); }
-  if (server->uri() != "/edit") { return; }
-  HTTPUpload& upload = server->upload();
+  if (Main::webServer.uri() != "/edit") { return; }
+  HTTPUpload& upload = Main::webServer.upload();
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
     // Make sure paths always start with "/"
@@ -430,7 +435,7 @@ void handleFileUpload() {
 void handleNotFound() {
   if (!fsOK) { return replyServerError(FPSTR(FS_INIT_ERROR)); }
 
-  String uri = ESP8266WebServer::urlDecode(server->uri());  // required to read paths with blanks
+  String uri = ESP8266WebServer::urlDecode(Main::webServer.uri());  // required to read paths with blanks
 
   if (handleFileRead(uri)) { return; }
 
@@ -440,19 +445,19 @@ void handleNotFound() {
   message = F("Error: File not found\n\nURI: ");
   message += uri;
   message += F("\nMethod: ");
-  message += (server->method() == HTTP_GET) ? "GET" : "POST";
+  message += (Main::webServer.method() == HTTP_GET) ? "GET" : "POST";
   message += F("\nArguments: ");
-  message += server->args();
+  message += Main::webServer.args();
   message += '\n';
-  for (uint8_t i = 0; i < server->args(); i++) {
+  for (uint8_t i = 0; i < Main::webServer.args(); i++) {
     message += F(" NAME:");
-    message += server->argName(i);
+    message += Main::webServer.argName(i);
     message += F("\n VALUE:");
-    message += server->arg(i);
+    message += Main::webServer.arg(i);
     message += '\n';
   }
   message += "path=";
-  message += server->arg("path");
+  message += Main::webServer.arg("path");
   message += '\n';
   DBG_OUTPUT_PORT.print(message);
 
@@ -462,7 +467,7 @@ void handleNotFound() {
 File fsUploadFile;
 
 void handleFileUploadFailsafe(String dir, String dest){ // upload a new file to the SPIFFS
-  HTTPUpload& upload = server->upload();
+  HTTPUpload& upload = Main::webServer.upload();
   if(upload.status == UPLOAD_FILE_START){
     String filename = upload.filename;
     if(!filename.startsWith("/")) filename = "/"+filename;
@@ -476,10 +481,10 @@ void handleFileUploadFailsafe(String dir, String dest){ // upload a new file to 
     if(fsUploadFile) {                                    // If the file was successfully created
       fsUploadFile.close();                               // Close the file again
       Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
-      server->sendHeader("Location",dest);      // Redirect the client to the success page
-      server->send(303);
+      Main::webServer.sendHeader("Location",dest);      // Redirect the client to the success page
+      Main::webServer.send(303);
     } else {
-      server->send(500, "text/plain", "500: couldn't create file");
+      Main::webServer.send(500, "text/plain", "500: couldn't create file");
     }
   }
 }
@@ -493,8 +498,8 @@ void handleFileUploadFailsafe(String dir, String dest){ // upload a new file to 
 void handleGetEdit() {
   if (handleFileRead(F("/edit/index.htm"))) { return; }
 
-    server->sendHeader("Location","/edit/upload");      // Redirect the client to the upload page
-      server->send(303);
+    Main::webServer.sendHeader("Location","/edit/upload");      // Redirect the client to the upload page
+      Main::webServer.send(303);
       return;
 
 #ifdef INCLUDE_FALLBACK_INDEX_HTM
@@ -509,8 +514,8 @@ void handleNotFound()
 
 }
 
-void setup(ESP8266WebServer &srv) {
-    server = &srv;
+void setup(/*ESP8266WebServer &srv*/) {
+   // server = &srv;
   ////////////////////////////////
   // SERIAL INIT
   DBG_OUTPUT_PORT.begin(115200);
@@ -545,43 +550,43 @@ void setup(ESP8266WebServer &srv) {
   ////////////////////////////////
   // WEB SERVER INIT
 
-    //server->onNotFound(handleNotFound);
+    //Main::webServer.onNotFound(handleNotFound);
 
   // Filesystem status
-  server->on("/status", HTTP_GET, [this](){this->handleStatus(); });
+  Main::webServer.on("/status", HTTP_GET, [/*this*/](){/*this->*/handleStatus(); });
 
   // List directory
-  server->on("/list", HTTP_GET, [this](){this->handleFileList(); });
+  Main::webServer.on("/list", HTTP_GET, [/*this*/](){/*this->*/handleFileList(); });
 
   // Load editor
-  server->on("/edit", HTTP_GET, [this](){this->handleGetEdit(); });
+  Main::webServer.on("/edit", HTTP_GET, [/*this*/](){/*this->*/handleGetEdit(); });
 
   // Create file
-  server->on("/edit", HTTP_PUT, [this](){this->handleFileCreate(); });
+  Main::webServer.on("/edit", HTTP_PUT, [/*this*/](){/*this->*/handleFileCreate(); });
 
   // Delete file
-  server->on("/edit", HTTP_DELETE, [this](){this->handleFileDelete(); });
+  Main::webServer.on("/edit", HTTP_DELETE, [/*this*/](){/*this->*/handleFileDelete(); });
 
 
-    server->on("/edit/upload", HTTP_GET, [this]() {                 // if the client requests the upload page
-        server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        server->sendHeader("Pragma", "no-cache");
-        server->sendHeader("Expires", "-1");
-        server->setContentLength(CONTENT_LENGTH_UNKNOWN); // *** BEGIN ***
+    Main::webServer.on("/edit/upload", HTTP_GET, [/*this*/]() {                 // if the client requests the upload page
+        Main::webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        Main::webServer.sendHeader("Pragma", "no-cache");
+        Main::webServer.sendHeader("Expires", "-1");
+        Main::webServer.setContentLength(CONTENT_LENGTH_UNKNOWN); // *** BEGIN ***
 
-        server->send(200,"text/html", "");
-        server->sendContent_P(upload_html);
-        server->sendContent("");
-        server->client().stop();
+        Main::webServer.send(200,"text/html", "");
+        Main::webServer.sendContent_P(upload_html);
+        Main::webServer.sendContent("");
+        Main::webServer.client().stop();
     });
-    server->on("/edit/upload", HTTP_POST,                       // if the client posts to the upload page
-        [this](){ server->send(200); },                          // Send status 200 (OK) to tell the client we are ready to receive
-        [this](){this->handleFileUploadFailsafe("/edit/", "/edit/index.htm"); }                                    // Receive and save the file
+    Main::webServer.on("/edit/upload", HTTP_POST,                       // if the client posts to the upload page
+        [/*this*/](){ Main::webServer.send(200); },                          // Send status 200 (OK) to tell the client we are ready to receive
+        [/*this*/](){/*this->*/handleFileUploadFailsafe("/edit/", "/edit/index.htm"); }                                    // Receive and save the file
     );
   // Upload file
   // - first callback is called after the request has ended with all parsed arguments
   // - second callback handles file upload at that location
-  server->on("/edit", HTTP_POST, [this](){this->replyOK();}, [this](){this->handleFileUpload();});
+  Main::webServer.on("/edit", HTTP_POST, [/*this*/](){/*this->*/replyOK();}, [/*this*/](){/*this->*/handleFileUpload();});
 
   // Default handler for all URIs not defined above
   // Use it to read files from filesystem

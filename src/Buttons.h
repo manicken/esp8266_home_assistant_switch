@@ -1,11 +1,12 @@
 #include <Arduino.h>
 #include <Adafruit_SSD1306.h>
 #include <ESP8266WebServer.h>
-#include "WebSocketHelper.h"
+//#include "WebSocketHelper.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include "FileHelpers.h"
+#include "Main.h"
 
 #ifndef BUTTONS_H
 #define BUTTONS_H
@@ -51,9 +52,6 @@ namespace Buttons {
     uint8_t buttonStates_raw = 0;
     bool buttons_pressed[64];
 
-    ESP8266WebServer *server;
-    //WebSocketsServer *webSocket;
-    Adafruit_SSD1306 *display; // mostly used for debug
     DynamicJsonDocument jsonDoc(BUTTONS_JSONDOC_SIZE);
     uint buttonCount = 0;
     int nrOfChips = 0;
@@ -69,23 +67,20 @@ namespace Buttons {
     void (*homeAssistant_exec_cb)(int,int);
     void (*localTuya_exec_cb)(int,int); 
 
-    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server,/*WebSocketsServer &_webSocket, */void(*homeAssistant_exec_cb)(int,int), void(*localTuya_exec_cb)(int,int))
+    void setup(void(*homeAssistant_exec_cb)(int,int), void(*localTuya_exec_cb)(int,int))
     {
-        display = &_display;
-        server = &_server;
-        //webSocket = &_webSocket;
         Buttons::homeAssistant_exec_cb = homeAssistant_exec_cb;
         Buttons::localTuya_exec_cb = localTuya_exec_cb;
 
-        server->on(BUTTONS_GET_MODE_URL, []() {
-            server->send(200, "text/plain", modes);
+        Main::webServer.on(BUTTONS_GET_MODE_URL, []() {
+            Main::webServer.send(200, "text/plain", modes);
         });
-        server->on(BUTTONS_GET_TARGETS_URL, []() {
-            server->send(200, "text/plain", targets);
+        Main::webServer.on(BUTTONS_GET_TARGETS_URL, []() {
+            Main::webServer.send(200, "text/plain", targets);
         });
-        server->on(BUTTONS_JSON_LOAD_URL, []() {
+        Main::webServer.on(BUTTONS_JSON_LOAD_URL, []() {
             loadJson();
-            server->send(200, "text/plain", "OK");
+            Main::webServer.send(200, "text/plain", "OK");
         });
         loadJson();
 
@@ -119,7 +114,7 @@ namespace Buttons {
         toSend.concat("\ntarget:"); toSend.concat(target);
         toSend.concat("\ntarget index:"); toSend.concat(targetIndex);
         toSend.concat("\ntarget mode:"); toSend.concat(targetMode);
-        WebSocketHelper::sendText(toSend);
+        Main::webSocketSendText(toSend);
         
         if (target == (int)BTN_TARGET::Home_Assistant) {
             if (homeAssistant_exec_cb != nullptr)
@@ -144,31 +139,31 @@ namespace Buttons {
 
             for (int bi=0;bi<8;bi++) { // bit index
                 btnIndex = ci*8+bi;
-                display->setCursor(bi*6*2, 32+8*ci);
+                Main::display.setCursor(bi*6*2, 32+8*ci);
                 if ((raw & 0x01) == 0x01 && buttons_pressed[btnIndex] == false) {
                     buttons_pressed[btnIndex] = true;
                     if (jsonDoc[btnIndex][BTN_JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Pressed ||
                         jsonDoc[btnIndex][BTN_JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
                         exec(btnIndex);
                     }
-                    display->print("1 ");
+                    Main::display.print("1 ");
                 } else if ((raw & 0x01) == 0x00 && buttons_pressed[btnIndex] == true) {
                     buttons_pressed[btnIndex] = false;
                     if (jsonDoc[btnIndex][BTN_JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Released ||
                         jsonDoc[btnIndex][BTN_JSON_NAME_BUTTON_EXEC_STATE] == (int)BTN_EXEC_STATE::Both) {
                         exec(btnIndex);
                     }
-                    display->print("0 ");
+                    Main::display.print("0 ");
                 } else if (buttons_pressed[btnIndex] == true) {
-                    display->print("1x");
+                    Main::display.print("1x");
                 } else if (buttons_pressed[btnIndex] == false) {
-                    display->print("0x");
+                    Main::display.print("0x");
                 }
                 
                 raw = raw >> 1;
             }
         }
-        display->display();
+        Main::display.display();
     }
 
     void loadJson()

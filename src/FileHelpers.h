@@ -5,28 +5,25 @@
 
 namespace FileHelpers {
 
-    ESP8266WebServer *server;
-
     bool load_from_file(String file_name, String &contents);
     bool write_to_file(String file_name, String contents);
     void server_handle_list_files();
     bool server_handleFileRead();
     String getContentType(String filename);
 
-    void setup(ESP8266WebServer &_server) {
-        server = &_server;
+    void setup() {
 
-        server->on("/listFiles", []() {
+        Main::webServer.on("/listFiles", []() {
             FileHelpers::server_handle_list_files();
         });
         
-        server->on("/formatLittleFs", []() {
-            if (LittleFS.format()) server->send(200,"text/html", "Format OK");
-            else server->send(200,"text/html", "format Fail");
+        Main::webServer.on("/formatLittleFs", []() {
+            if (LittleFS.format()) Main::webServer.send(200,"text/html", "Format OK");
+            else Main::webServer.send(200,"text/html", "format Fail");
         });
-        server->onNotFound([]() {                              // If the client requests any URI
+        Main::webServer.onNotFound([]() {                              // If the client requests any URI
             if (!FileHelpers::server_handleFileRead())                  // send it if it exists
-                server->send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
+                Main::webServer.send(404, "text/plain", "404: Not Found"); // otherwise, respond with a 404 (Not Found) error
         });
     }
     bool load_from_file(String file_name, String &contents) {
@@ -70,7 +67,7 @@ namespace FileHelpers {
             str += dir.fileSize();
             str += "\n";
         }
-        server->send(200, "text/plain", str);
+        Main::webServer.send(200, "text/plain", str);
     }
     String getContentType(String filename) { // convert the file extension to the MIME type
         if (filename.endsWith(".html")) return "text/html";
@@ -81,7 +78,7 @@ namespace FileHelpers {
         return "text/plain";
     }
     bool server_handleFileRead() { // send the right file to the client (if it exists)
-        String path = server->uri();
+        String path = Main::webServer.uri();
         Serial.println("handleFileRead: " + path);
         if (path.endsWith("/")) path += "index.html";          // If a folder is requested, send the index file
         String contentType = getContentType(path);             // Get the MIME type
@@ -90,7 +87,7 @@ namespace FileHelpers {
             if (LittleFS.exists(pathWithGz))                         // If there's a compressed version available
             path += ".gz";                                         // Use the compressed verion
             File file = LittleFS.open(path, "r");                    // Open the file
-            size_t sent = server->streamFile(file, contentType);    // Send it to the client
+            size_t sent = Main::webServer.streamFile(file, contentType);    // Send it to the client
             file.close();                                          // Close the file again
             Serial.println(String("\tSent file: ") + path);
             return true;

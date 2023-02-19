@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include "FileHelpers.h"
+#include "Main.h"
 
 #ifndef LOCAL_TUYA_H
 #define LOCAL_TUYA_H
@@ -25,50 +26,45 @@ namespace LocalTuya
         toggle = (2)
     };
 
-    ESP8266WebServer *server;
-    Adafruit_SSD1306 *display;
     TuyaDevice plug;
     DynamicJsonDocument jsonDoc(LOCAL_TUYA_JSONDOC_SIZE);
     String jsonStr = "";
 
-    void setup(ESP8266WebServer &_server);
+    void setup();
     void exec(int index, int mode);
     void loadJson();
     void set_default_jsonDoc_properties_if_needed();
 
-    void setup(Adafruit_SSD1306 &_display, ESP8266WebServer &_server)
+    void setup()
     {
-        display = &_display;
-        server = &_server;
-
-        server->on(LOCAL_TUYA_JSON_LOAD_URL, []() {
+        Main::webServer.on(LOCAL_TUYA_JSON_LOAD_URL, []() {
             loadJson();
-            server->send(200, "text/plain", "OK");
+            Main::webServer.send(200, "text/plain", "OK");
         });
         loadJson();
     }
 
     void exec(int index, int mode)
     {
-        display->setCursor(0,26);
-        display->print("                ");
-        display->setCursor(0,26);
+        Main::display.setCursor(0,26);
+        Main::display.print("                ");
+        Main::display.setCursor(0,26);
         
         if (jsonDoc[index] == nullptr) {
-            display->print(index);
-            display->print(" device index not found");
+            Main::display.print(index);
+            Main::display.print(" device index not found");
             return;
         }
         if (jsonDoc[index][LT_JSON_NAME_DEVICE_ID] == nullptr) {
-            display->print(" device id not found");
+            Main::display.print(" device id not found");
             return;
         }
         if (jsonDoc[index][LT_JSON_NAME_DEVICE_KEY] == nullptr) {
-            display->print(" device key not found");
+            Main::display.print(" device key not found");
             return;
         }
         if (jsonDoc[index][LT_JSON_NAME_DEVICE_HOST] == nullptr) {
-            display->print(" device host not found");
+            Main::display.print(" device host not found");
             return;
         }
         tuya_error_t err;
@@ -84,12 +80,11 @@ namespace LocalTuya
             err = plug.toggle();
 
         if (err == tuya_error_t::TUYA_OK)
-            display->print("OK");
+            Main::display.print("OK");
         else {
-            display->print(err);
-            display->print(plug.response);
+            Main::display.print(err);
+            Main::display.print(plug.response);
         }
-            
     }
 
     void loadJson()
