@@ -11,3 +11,10 @@ Also having WebSocketServer for easy debug<br>
 <br>
 Prototype board:<br>
 ![Prototype](/images/prototype.jpg)
+<br>
+Home Assistant Configuration:<br>
+![Prototype](/images/HomeAssistantConfig.jpg)
+<br>
+Local Tuya Configuration:<br>
+![Prototype](/images/LocalTuyaConfig.jpg)
+<br>
