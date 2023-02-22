@@ -59,6 +59,7 @@ function loadConfiguration()
 {
   getFile("../cfg.json", function(contents3){
     data = JSON.parse(contents3);
+    document.getElementById("itemCount").value = data.length;
     drawTable();
   });
 }

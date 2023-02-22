@@ -2,12 +2,41 @@
 <html>
 <head>
 <title>Home Assistant WiFi Switch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" /> 
 <meta name="description" content="Our first page">
 <meta name="keywords" content="html tutorial template">
+<style>
+  * {
+    font-family:sans-serif;
+    margin:0;
+    padding:0;
+  }
+  body {
+    width:100%;
+    max-width:500px;
+    background-color:#777;
+  }
+  button {
+    background-color:#AAA;
+  }
+  .MenuItem {
+    display:block;
+    margin:25px;
+    width:100%;
+  }
+  .MenuItem button {
+    padding:10px;
+   /* width:200px;*/
+    width:100%;
+    font-size:16px;
+  }
+</style>
 </head>
 <body>
-buttons to control should be here
-<br>
-<a href="./ha/settings/index.html">Settings</a>
+<div class="MenuItem"><a href="./btn/cfg/index.html"><button type="button">Buttons Config</button></a></div>
+<div class="MenuItem"><a href="./ha/cfg/index.html"><button type="button">Home Assistant Config</button></a></div>
+<div class="MenuItem"><a href="./tuya/cfg/index.html"><button type="button">Local Tuya Config</button></a></div>
+<div class="MenuItem"><a href="./edit"><button type="button">File manager</button></a></div>
+<div class="MenuItem"><a href="./test/index.html"><button type="button">Test</button></a></div>
 </body>
 </html>

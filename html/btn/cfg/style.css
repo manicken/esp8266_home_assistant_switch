@@ -5,12 +5,14 @@
   }
   
   .Menu {
-    margin-left:40px;
+    margin-left:10px;
     padding-top:10px;
   }
 
   body {
-    background-color:#444;
+    background-color:#777;
+    width:100%;
+    max-width:675px;
   }
   
   h1 {
@@ -20,7 +22,7 @@
     
   }
   table {
-    margin-top:25px;
+    margin-top:5px;
     margin-left:25px;
     table-layout: fixed;
     
@@ -35,11 +37,16 @@
   th,td {
     overflow: hidden;
   }
+  td {
+    height:30px;
+  }
   select {
     width:100%;
+    height:100%;
   }
   input {
     width:100%;
+    height:100%;
   }
 
   .MenuItem {
@@ -58,9 +65,26 @@
   }
   
   .itemCount_row {
-    margin-top:20px;
-    margin-left:50px;
+    margin-top:-10px;
+    margin-left:20px;
     margin-right:20px;
+  }
+  
+  .dataTable_row {
+    width:400px;
+    border-style:solid;
+    margin-left:5px;
+    margin-right:5px;
+    margin-top:10px;
+    padding-bottom:5px;
+  }
+  .dataTable_row_label {
+    background-color:#777;
+    margin-left:20px;
+    padding-left:2px;
+    padding-right:2px;
+    position:relative;
+    top:-10px;
   }
   
   #info {
@@ -69,7 +93,7 @@
   
   #colIndex {
     width:20px;
-    background-color:#444;
+    background-color:#777;
   }
   
   #colTarget {

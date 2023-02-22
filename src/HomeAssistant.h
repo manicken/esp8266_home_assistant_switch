@@ -66,7 +66,7 @@ namespace HomeAssistant {
     {
         bool changed = false;
         if (jsonDoc.containsKey(HA_JSON_NAME_AUTHORIZATION) == false) {
-            jsonDoc[HA_JSON_NAME_AUTHORIZATION] = "Bearer";
+            jsonDoc[HA_JSON_NAME_AUTHORIZATION] = "";
             changed = true;
         }
         if (jsonDoc.containsKey(HA_JSON_NAME_SERVER) == false) {
@@ -109,7 +109,8 @@ namespace HomeAssistant {
 
     void setHomeAssistantHttpHeader()
     {
-        String auth = jsonDoc[HA_JSON_NAME_AUTHORIZATION];
+        String auth = "Bearer ";
+        auth.concat((String)jsonDoc[HA_JSON_NAME_AUTHORIZATION]);
         //DEBUG_UART.println(auth);
         http.addHeader("authorization", auth);
         http.addHeader("Content-Type", "application/json");

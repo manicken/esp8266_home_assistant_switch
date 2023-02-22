@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>Home Assistant WiFi Switch - Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" /> 
 <script type='text/javascript' src='main.js'></script>
 <link rel="stylesheet" type="text/css" href="style.css"/>
 </head>
@@ -14,25 +15,29 @@
   </div>
   <div class='common_cfg'>
     <label for="authorization">Authorization:</label>
-    <input type="text" id="authorization" name="authorization">
+    <!--<input type="text" id="authorization" name="authorization">-->
+    <textarea rows="4" id="authorization" name="authorization"></textarea>
   </div>
   <div class='common_cfg'>
     <label for="server">Server:</label><br>
-    <input style="width:400px;" type="text" id="server" name="server">
+    <input style="width:100%;" type="text" id="server" name="server">
   </div>
-  <div class='itemCount_row'>
-    <label for="itemCount">Item count:</label>
-    <input style="width:50px; height:32px; font-size:20px; padding-right:5px; text-align:right;" type="text" id="itemCount" name="itemCount">
-    <div class="MenuItem"><button type="button" onclick="applyNewItemCount()" style="width:75px; font-weight:bold;">update</button></div>
+  <div class="dataTable_row">
+    <label class="dataTable_row_label">Entities:</label>
+    <div class='itemCount_row'>
+      <label for="itemCount">Item count:</label>
+      <input style="width:50px; height:32px; font-size:20px; padding-right:5px; text-align:right;" type="text" id="itemCount" name="itemCount">
+      <div class="MenuItem"><button type="button" onclick="applyNewItemCount()" style="width:75px; font-weight:bold;">update</button></div>
+    </div>
+    <table id="dataTable">
+      <thead id="dataTableHeader">
+        <tr><th id="colIndex"></th><th id="colEntityId">Entity ID</th></tr>
+      </thead>
+      <tbody id="dataTableBody">
+        
+      </tbody>
+    </table>
   </div>
-  <table id="dataTable">
-    <thead id="dataTableHeader">
-      <tr><th id="colIndex"></th><th id="colEntityId">Entity ID</th></tr>
-    </thead>
-    <tbody id="dataTableBody">
-      
-    </tbody>
-  </table>
   <div id='info'></div>
 </body>
 </html>
