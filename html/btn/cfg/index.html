@@ -12,8 +12,24 @@
     <div class="MenuItem"><button type="button" onclick="saveConfiguration()" style="width:75px; font-weight:bold;">save</button></div>
     <div class="MenuItem"><button type="button" onclick="loadConfiguration()" style="width:75px; font-weight:bold;">reload</button></div>
   </div>
+  <div class='itemCount_row'>
+    <label for="itemCount">Item count:</label>
+    <input style="width:50px; height:32px; font-size:20px; padding-right:5px; text-align:right;" type="text" id="itemCount" name="itemCount">
+    <div class="MenuItem"><button type="button" onclick="applyNewItemCount()" style="width:75px; font-weight:bold;">update</button></div>
+  </div>
   <table id="dataTable">
-    
+    <thead id="dataTableHeader">
+      <tr>
+        <th id="colIndex"></th>
+        <th id="colTarget">Target</th>
+        <th id="colTargetIndex">Target<br>Index</th>
+        <th id="colTargetMode">Target<br>Mode</th>
+        <th id="colButtonExecState">Button<br>Exec<br>State</th>
+      </tr>
+    </thead>
+    <tbody id="dataTableBody">
+      
+    </tbody>
   </table>
   <div id='info'></div>
 </body>

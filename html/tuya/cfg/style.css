@@ -41,6 +41,12 @@
   input {
     width:100%;
   }
+  
+  .itemCount_row {
+    margin-top:20px;
+    margin-left:50px;
+    margin-right:20px;
+  }
 
   .MenuItem {
     display:inline-block;

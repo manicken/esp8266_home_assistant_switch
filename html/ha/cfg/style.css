@@ -19,11 +19,14 @@
     color:#454545;
     
   }
+  
+  input #server  {
+    width:500px;
+  }
   table {
-    margin-top:25px;
+    margin-top:5px;
     margin-left:25px;
     table-layout: fixed;
-    
   }
   
   th {
@@ -57,10 +60,28 @@
     text-align:center;
   }
   
-  .other_items {
+  .common_cfg {
+    margin-top:5px;
+    margin-left:5px;
+    margin-right:5px;
+    border-style:solid;
     padding-left:20px;
     padding-right:20px;
-    padding-top:10px;
+    padding-top:5px;
+    padding-bottom:5px;
+  }
+  .common_cfg input {
+    padding:2px;
+  }
+  
+  #dataTable select,input {
+    padding:2px;
+  }
+  
+  .itemCount_row {
+    margin-top:20px;
+    margin-left:50px;
+    margin-right:20px;
   }
   
   #info {

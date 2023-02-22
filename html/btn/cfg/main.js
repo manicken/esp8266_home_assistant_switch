@@ -1,5 +1,9 @@
 window.addEventListener('load', setup);
 
+function getNewButtonItem() {
+  return {target:0,ti:0,tm:0,bes:1};
+}
+
 var modes = [];
 var targets = [];
 var data = [];
@@ -54,7 +58,7 @@ function getButtonExecStateOptionsHtml()
 }
 
 function drawTable(){
-  var dataTableHtml = '<tr><th id="colIndex"></th><th id="colTarget">Target</th><th id="colTargetIndex">Target<br>Index</th><th id="colTargetMode">Target<br>Mode</th><th id="colButtonExecState">Button<br>Exec<br>State</th></tr>';
+  var dataTableHtml = "";
   
   for(var i=0;i<data.length;i++) {
     dataTableHtml += '<tr>';
@@ -66,7 +70,7 @@ function drawTable(){
     dataTableHtml += '</tr>';
   }
 
-  document.getElementById("dataTable").innerHTML = dataTableHtml;
+  document.getElementById("dataTableBody").innerHTML = dataTableHtml;
   // set values for select types
   for(var i=0;i<data.length;i++) {
     document.getElementById("target_"+i).value = data[i].target;
@@ -75,10 +79,28 @@ function drawTable(){
   }
 }
 
+function applyNewItemCount()
+{
+  var newItemCount = parseInt(document.getElementById("itemCount").value);
+  if (newItemCount == data.length) return;
+  
+  if (newItemCount > data.length) {
+    var diff = newItemCount - data.length;
+    for(var i=0;i<diff;i++)
+      data.push(getNewButtonItem());
+  }
+  else {
+    var diff = data.length - newItemCount;
+    data.splice(newItemCount, diff);
+  }
+  drawTable();
+}
+
 function loadConfiguration()
 {
   getFile("../cfg.json", function(contents3){
     data = JSON.parse(contents3);
+    document.getElementById("itemCount").value = data.length;
     drawTable();
   });
 }
@@ -89,14 +111,14 @@ function saveConfiguration()
   data = [];
   //console.log(data.length);
   for (var i=0;i<count; i++) {
-    settings.push({
+    data.push({
       target:parseInt(document.getElementById("target_"+i).value),
       ti:parseInt(document.getElementById("ti_"+i).value),
       tm:parseInt(document.getElementById("tm_"+i).value),
       bes:parseInt(document.getElementById("bes_"+i).value)
     });
   }
-  var dataJSON = JSON.stringify(settings,null, 4);
+  var dataJSON = JSON.stringify(data,null, 4);
   //console.log(settingsJSON);
   postFile("/btn/cfg.json", dataJSON, "text/json")
 }

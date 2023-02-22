@@ -2,7 +2,7 @@ window.addEventListener('load', setup);
 
 var switches = [];
 
-var data = [];
+var data = {authorization:"",server:"",entities:[]} ;
 
 function setup() {
   loadConfiguration();
@@ -29,12 +29,16 @@ function getEntityIdOptionsHtml()
   return html;
 }
 
-function drawTable(){
+function updateData() {
   document.getElementById("authorization").value = data.authorization;
   document.getElementById("server").value = data.server;
+  drawTable();
+}
+
+function drawTable(){
   
-  var dataTableHtml = '<tr><th id="colIndex"></th><th id="colEntityId">Entity ID</th></tr>';
-  
+  var dataTableHtml = '';
+
   for(var i=0;i<data.entities.length;i++) {
     dataTableHtml += '<tr>';
     dataTableHtml += '<td style="text-align:center;">' + (i+1) + '</td>';
@@ -45,7 +49,7 @@ function drawTable(){
       dataTableHtml += '<td><input id="entity_' + i + '" class="entityItem" type="text" value="' + data.entities[i] + '"></td>';
     dataTableHtml += '</tr>';
   }
-  document.getElementById("dataTable").innerHTML = dataTableHtml;
+  document.getElementById("dataTableBody").innerHTML = dataTableHtml;
   
   for(var i=0;i<data.entities.length;i++) {
     document.getElementById("entity_"+i).value = data.entities[i];
@@ -87,12 +91,31 @@ function getSwitchEntities(whenDone) {
     }
 }
 
+function applyNewItemCount()
+{
+  var newItemCount = parseInt(document.getElementById("itemCount").value);
+  if (newItemCount == data.entities.length) return;
+  
+  if (newItemCount > data.entities.length) {
+    var diff = newItemCount - data.entities.length;
+    for(var i=0;i<diff;i++)
+      data.entities.push("");
+  }
+  else {
+    var diff = data.entities.length - newItemCount;
+    data.entities.splice(newItemCount, diff);
+  }
+  drawTable();
+}
+
 function loadConfiguration()
 {
   getFile("../cfg.json", function(contents3){
     data = JSON.parse(contents3);
-    
-    getSwitchEntities(drawTable);
+    document.getElementById("itemCount").value = data.entities.length;
+    // allways draw table
+    updateData();
+    getSwitchEntities(updateData);
   });
 }
 

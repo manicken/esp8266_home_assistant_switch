@@ -1,5 +1,9 @@
 window.addEventListener('load', setup);
 
+function getNewDeviceItem() {
+  return {id:"",key:"",host:""};
+}
+
 var data = [];
 
 function setup() {
@@ -20,7 +24,7 @@ function getFile(path, whenLoaded) {
 }
 
 function drawTable(){
-  var dataTableHtml = '<tr><th id="colIndex"></th><th id="colId">Id</th><th id="colKey">Local Key</th><th id="colHost">Host</th></tr>';
+  var dataTableHtml = '';
   
   for(var i=0;i<data.length;i++) {
     dataTableHtml += '<tr>';
@@ -31,7 +35,24 @@ function drawTable(){
     dataTableHtml += '</tr>';
   }
 
-  document.getElementById("dataTable").innerHTML = dataTableHtml;
+  document.getElementById("dataTableBody").innerHTML = dataTableHtml;
+}
+
+function applyNewItemCount()
+{
+  var newItemCount = parseInt(document.getElementById("itemCount").value);
+  if (newItemCount == data.length) return;
+  
+  if (newItemCount > data.length) {
+    var diff = newItemCount - data.length;
+    for(var i=0;i<diff;i++)
+      data.push(getNewDeviceItem());
+  }
+  else {
+    var diff = data.length - newItemCount;
+    data.splice(newItemCount, diff);
+  }
+  drawTable();
 }
 
 function loadConfiguration()
@@ -56,7 +77,7 @@ function saveConfiguration()
   }
   var dataJSON = JSON.stringify(data,null, 4);
   //console.log(datasJSON);
-  postFile("/tuya/cfg.json", datasJSON, "text/json")
+  postFile("/tuya/cfg.json", datasJSON, "text/json");
 }
 
 function setState(msg) {

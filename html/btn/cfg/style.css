@@ -57,6 +57,12 @@
     text-align:center;
   }
   
+  .itemCount_row {
+    margin-top:20px;
+    margin-left:50px;
+    margin-right:20px;
+  }
+  
   #info {
     margin:20px;
   }
