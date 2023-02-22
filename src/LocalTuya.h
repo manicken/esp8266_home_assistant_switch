@@ -1,6 +1,7 @@
 
 #include <Arduino.h>
-#include "ArduinoTuya.h"
+//#include "ArduinoTuya.h"
+//#include "TuyaLocal.hpp"
 #include <Adafruit_SSD1306.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
@@ -25,8 +26,8 @@ namespace LocalTuya
         on = (1),
         toggle = (2)
     };
-
-    TuyaDevice plug;
+    //tuyaLocal tl;
+    //TuyaDevice plug;
     DynamicJsonDocument jsonDoc(LOCAL_TUYA_JSONDOC_SIZE);
     String jsonStr = "";
 
@@ -67,7 +68,7 @@ namespace LocalTuya
             Main::display.print(" device host not found");
             return;
         }
-        tuya_error_t err;
+        /*tuya_error_t err;
         plug.begin(jsonDoc[index][LT_JSON_NAME_DEVICE_ID], 
                    jsonDoc[index][LT_JSON_NAME_DEVICE_KEY],
                    jsonDoc[index][LT_JSON_NAME_DEVICE_HOST]);
@@ -85,6 +86,48 @@ namespace LocalTuya
             Main::display.print(err);
             Main::display.print(plug.response);
         }
+        */
+       /*
+        bool send = false;
+        String dps = "";
+
+        if (mode == (int)SWITCH_MODE::off) {
+            send = true;
+            dps = "\"dps\":{\"1\":false}";
+        }
+        else if (mode == (int)SWITCH_MODE::on) {
+            send = true;
+            dps = "\"dps\":{\"1\":true}";
+        }
+        else if (mode == (int)SWITCH_MODE::toggle) {
+            // TODO
+            // need to first read status from device 
+            tl.begin(jsonDoc[index][LT_JSON_NAME_DEVICE_HOST], 
+                jsonDoc[index][LT_JSON_NAME_DEVICE_ID], 
+                jsonDoc[index][LT_JSON_NAME_DEVICE_KEY]);
+
+            if (tl.connect() == false) { DEBUG_UART.print("fuck u china"); return; }
+            
+            tl.getDps(dps);
+            DEBUG_UART.println("");
+            DEBUG_UART.println(dps);
+            if (dps.startsWith("{\"dps\":{\"1\":true")) { dps = "\"dps\":{\"1\":false}"; send = true;}
+            else if (dps.startsWith("{\"dps\":{\"1\":false")) { dps = "\"dps\":{\"1\":true}"; send = true;}
+            tl.disconnect();
+            //DEBUG_UART.print(dps);
+        }
+
+        if (send == true) {
+            tl.begin(jsonDoc[index][LT_JSON_NAME_DEVICE_HOST], 
+                jsonDoc[index][LT_JSON_NAME_DEVICE_ID], 
+                jsonDoc[index][LT_JSON_NAME_DEVICE_KEY]);
+
+            if (tl.connect() == false) return;
+            String result = "";
+            tl.setDps(dps, result);
+            tl.disconnect();
+            DEBUG_UART.print(result);
+        }*/
     }
 
     void loadJson()

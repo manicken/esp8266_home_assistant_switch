@@ -12,7 +12,7 @@
 #endif
 
 #ifndef TUYA_VERSION_DEFAULT
-#define TUYA_VERSION_DEFAULT  "3.3"
+#define TUYA_VERSION_DEFAULT  "3.2"
 #endif
 
 #ifndef TUYA_TIMEOUT
@@ -90,8 +90,8 @@ class TuyaDevice {
     MD5Builder _md5;
     WiFiClient _client;
 
-    const byte prefix[16] = { 0, 0, 85, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    const byte suffix[8]  = { 0, 0, 0, 0, 0, 0, 170, 85 };
+    const byte prefix[16] = { 0, 0, 0x55, 0xAA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    const byte suffix[8]  = { 0, 0, 0, 0, 0, 0, 0xAA, 0x55 };
 
     String _id;
     String _key;
@@ -105,7 +105,9 @@ class TuyaDevice {
     void initGetRequest(JsonDocument &jsonRequest);
     void initSetRequest(JsonDocument &jsonRequest);
     String createPayload(JsonDocument &jsonRequest, bool encrypt = true);
+    int createPayload2(String &jsonString, byte* returnData);
     String sendCommand(String &payload, byte command);
+    String sendCommand(byte *payload, int payloadLength, byte command);
     
   public:
   String response;  
